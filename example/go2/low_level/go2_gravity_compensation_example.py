@@ -54,13 +54,13 @@ class Custom:
         # [FR_hip, FR_thigh, FR_calf, FL_hip, FL_thigh, FL_calf, ...]
         # _targetPos_1: A lying-down pose
         self._targetPos_1 = [0.0, 1.36, -2.65, 0.0, 1.36, -2.65,
-                             -0.2, 1.36, -2.65, 0.2, 1.36, -2.65]
+                             -0.2, 1.36, -2.65, 0.2, 1.36, -2.65] # [0, 78, -152, 0, 78, -152, -11, 78, -152, 11, 78, -152] in degrees
         # _targetPos_2: A "crouched" standing pose
         self._targetPos_2 = [0.0, 0.67, -1.3, 0.0, 0.67, -1.3,
-                             0.0, 0.67, -1.3, 0.0, 0.67, -1.3]
+                             0.0, 0.67, -1.3, 0.0, 0.67, -1.3] # [0, 38, -74, 0, 38, -74, 0, 38, -74, 0, 38, -74] in degrees
         # _targetPos_3: A different pose (used for the end of the sequence)
         self._targetPos_3 = [-0.35, 1.36, -2.65, 0.35, 1.36, -2.65,
-                             -0.5, 1.36, -2.65, 0.5, 1.36, -2.65]
+                             -0.5, 1.36, -2.65, 0.5, 1.36, -2.65] # [-20, 78, -152, 20, 78, -152, -29, 78, -152, 29, 78, -152] in degrees
 
         # --- State Machine Interpolation Variables ---
         self.startPos = [0.0] * 12  # Will store the robot's starting position
