@@ -65,10 +65,10 @@ class Custom:
         # --- State Machine Interpolation Variables ---
         self.startPos = [0.0] * 12  # Will store the robot's starting position
         # Durations for each phase of the motion (in loop counts)
-        self.duration_1 = 500  # 500 * 0.002s = 1.0 second
-        self.duration_2 = 500  # 1.0 second
-        self.duration_3 = 1000 # 2.0 seconds
-        self.duration_4 = 900  # 1.8 seconds
+        self.duration_1 = 500   # 500 * 0.002s = 1.0 seconds
+        self.duration_2 = 500   # 1.0 seconds
+        self.duration_3 = 15000 # 30.0 seconds
+        self.duration_4 = 900   # 1.8 seconds
         # Percentages for interpolating between poses (0.0 to 1.0)
         self.percent_1 = 0
         self.percent_2 = 0
@@ -87,8 +87,6 @@ class Custom:
 
     # Public methods
     def Init(self):
-        # This function sets up everything.
-
         # 1. Initialize the low_cmd structure with safe, default values
         self.InitLowCmd()
 
@@ -207,16 +205,24 @@ class Custom:
                 self.low_cmd.motor_cmd[i].tau = 0
 
         # --- Phase 3: Hold _targetPos_2 (crouch) ---
+        # add impedance control logic here to hold position and compensate for gravity 
+        # Here we can change the kp and kd to view different effects of their values on the robots interaction.
         # This only runs after Phase 2 is 100% done
+        Kp_hold = 40.0  # Stiffness for holding position
+        Kd_hold = 5.0   # Damping for holding position
+        tau_gravity_compensation = [1,1,1,1,1,1,1,1,1,1,1,1]  # Gravity compensation FF torque
+
         if (self.percent_1 == 1) and (self.percent_2 == 1) and (self.percent_3 < 1):
             self.percent_3 += 1.0 / self.duration_3
             self.percent_3 = min(self.percent_3, 1)
             for i in range(12):
                 self.low_cmd.motor_cmd[i].q = self._targetPos_2[i] # Just hold the position
                 self.low_cmd.motor_cmd[i].dq = 0
-                self.low_cmd.motor_cmd[i].kp = self.Kp
-                self.low_cmd.motor_cmd[i].kd = self.Kd
-                self.low_cmd.motor_cmd[i].tau = 0
+                # self.low_cmd.motor_cmd[i].kp = self.Kp
+                # self.low_cmd.motor_cmd[i].kd = self.Kd
+                self.low_cmd.motor_cmd[i].kp = Kp_hold
+                self.low_cmd.motor_cmd[i].kd = Kd_hold
+                self.low_cmd.motor_cmd[i].tau = tau_gravity_compensation[i]  # Apply gravity compensation torque
 
         # --- Phase 4: Move from _targetPos_2 to _targetPos_3 ---
         # This only runs after Phase 3 is 100% done
