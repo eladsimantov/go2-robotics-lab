@@ -1,0 +1,137 @@
+the network card name corresponding to the IP address 192.168.123.222 is enp4s0
+
+The simulator will use an Xbox or Switch gamepad to simulate the wireless controller of the robot. The button and joystick information of the wireless controller will be published through "rt/wireless_controller" topic. use_joystick/USE_JOYSTICK in config.yaml/config.py needs to be set to 0, when there is no gamepad.
+
+The cyclonedds version of Unitree robot is 0.10.2. To communicate with Unitree robots using ROS2, it is necessary to change the dds implementation. See：https://docs.ros.org/en/foxy/Concepts/About-Different-Middleware-Vendors.html
+
+"source/opt/ros/foxy/setup. bash" has been added to the ~/.bashrc file when installing ROS2, it needs to be commented out
+
+
+# SIMULATOR:
+sudo ip link set lo multicast on
+cd Unitree/unitree_mujoco/simulate_python/
+python3 unitree_mujoco.py
+
+# SIMULATION:
+cd
+cd Unitree/unitree_mujoco/example/python
+python3 stand_go2.py
+
+# LOW-LEVEL:
+ping 192.168.123.161
+cd Unitree/go2_python_sdk2/example/low_level
+python3 2002_read_lowstate.py enp4s0
+
+
+# SDK [high-level]
+cd Unitree/unitree_sdk2_python/example/go2/high_level
+python3 go2_sport_client.py lo0
+
+# UPDATE
+cd Unitree/unitree_sdk2_python 
+git pull origin master
+
+
+# SSH
+ssh -X unitree@192.168.123.18
+
+
+~/Unitree/go2_python_sdk2/example/low_level$ scp ./1701_read_lowstate.py human@132.68.162.50:/home/human
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Enter id or name: 
+3
+Test: move forward, test_id: 3
+Updated Test Option: Name = move forward, ID = 3
+
+> /home/bennavon/Unitree/unitree_sdk2_python/example/go2/high_level/unitree_sdk2py/rpc/client_base.py(55)_CallNoReplyBase()
+-> if self.__stub.Send(request, self.__timeout):
+(Pdb) list
+ 50  	    def _CallNoReplyBase(self, apiId: int, parameter: str, proirity: int, leaseId: int):
+ 51  	        header = self.__SetHeader(apiId, leaseId, proirity, True)
+ 52  	        request = Request(header, parameter, [])
+ 53  	
+ 54  	        breakpoint()
+ 55  ->	        if self.__stub.Send(request, self.__timeout):
+ 56  	            return 0
+ 57  	        else:
+ 58  	            return RPC_ERR_CLIENT_SEND
+ 59  	
+ 60  	    def _CallBinaryBase(self, apiId: int, parameter: list, proirity: int, leaseId: int):
+(Pdb) print(request)
+Request_(header=RequestHeader_(identity=RequestIdentity_(id=350962467938083, api_id=1008), lease=RequestLease_(id=0), policy=RequestPolicy_(priority=0, noreply=True)), parameter='{"x": 0.3, "y": 0, "z": 0}', binary=[])
+(Pdb) n
+[ClientStub] send error. id: 350962467938083
+> /home/bennavon/Unitree/unitree_sdk2_python/example/go2/high_level/unitree_sdk2py/rpc/client_base.py(58)_CallNoReplyBase()
+-> return RPC_ERR_CLIENT_SEND
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+!! INSTALL : GO2PY 
+works: unitree_mujoco/example/python --> stand_go2.py
+!! FIX : unitree_sdk2_python/example/go2/high_level --> go2_sport_client.py
+לבדוק איזה IP הרובוט מקבל 
+++ לחבר מחשב נייד לקיר ולהבין מה IP (ip a)
+להתאים את כל החבילות בסיס לפי הדרישות של MUJOCO הכי חדש 
+++ לשקול לשנות לרובוט אחר 
+לבדוק ש REPO מתעדכן אוטומטית כל שבוע
+
+Can give commands to all individual joints?
+How many independent joints? 
+Did you try to give proportional commands to these joints so that the robot walks?  
+	You can define a basic 'walking pattern' (expressing the proportion of simultaneous activation of the joints) and then it's amplitude will define the walking speed of the robot.
+	
+	
+	
+
+
+מהזום עם מתן:
+
+לדעות הבעיה בתקשורת פנימית: NETWORK ISSUE -- communication 
+לנסות להריץ את כל הדוגמאות: 
+	* עבד DDS Communication קבצים publisher.py subscriber.py
+	* לא קיים High-Level Status קובץ read_highstate.py
+	* לא קיים High-Level Control קובץ sportmode_test
+	* לא עובד Low-Level Status קובץ lowlevel_control
+	!! לתקן circular import: 
+														cd Unitree/unitree_sdk2_python/unitree_sdk2py/test/lowlevel/
+														python3 lowlevel_control.py enp2s0
+להריץ טסטים	 unitree_sdk2py/test  [לדעתו של מתן יפול ב CLIENT]
+השלב האחרון שאליו הגענו בבדיקה: SPORT/SPORT_API.PY או RPC/INTERNAL.PY [RPC_ERR_CLIENT_SEND = 3102]		
+
+$ cd Unitree/unitree_sdk2_python/example/go2/high_level
+python3 go2_sport_client.py lo
+Enter id or name: 
+0
+Test: damp, test_id: 0
+Updated Test Option: Name = damp, ID = 0
+
+start_future 	# rpc/client_base.py --> _CallBase --> request = Request(header, parameter, [])
+							print("start_future")
+temp False 	# rpc/client_stub.py --> SendRequest --> temp = self.__sendChannel.Write(request, timeout)
+							print("temp", temp)
+[ClientStub] send request error. id: 252159740849420 	# rpc/client_stub.py --> SendRequest --> print("[ClientStub] send request error. id:", request.header.identity.id)
+end_future 	# rpc/client_base.py --> _CallBase --> future = self.__stub.SendRequest(request, self.__timeout)
+					        	print("end_future")
+34 	# rpc/client_base.py --> _CallBase --> if future is None:
+						print("34")
+						return RPC_ERR_CLIENT_SEND, None # <-- FAIL HERE ! 
+						
+						
+התקנתי pip install unitree_sdk2py בתקית UNITREE. 
+כשמריץ סימולציה stand_go2.py יש שגיאה: 
+	$ cd Unitree/unitree_mujoco/example/python
+	python3 stand_go2.py
+	Traceback (most recent call last):
+	  File "/home/bennavon/Unitree/unitree_mujoco/example/python/stand_go2.py", line 5, in <module>
+    from unitree_sdk2py.core.channel import ChannelPublisher, ChannelSubscriber
+  File "/home/bennavon/.local/lib/python3.10/site-packages/unitree_sdk2py/__init__.py", line 1, in <module>
+    from . import idl, utils, core, rpc, go2, b2
+ImportError: cannot import name 'b2' from partially initialized module 'unitree_sdk2py' (most likely due to a circular import) (/home/bennavon/.local/lib/python3.10/site-packages/unitree_sdk2py/__init__.py)
+
+
+
+
+
