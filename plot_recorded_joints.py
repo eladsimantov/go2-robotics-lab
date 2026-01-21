@@ -31,3 +31,19 @@ plt.legend(loc='best', ncol=2)
 plt.grid(True)
 plt.tight_layout()
 plt.show()
+
+# Plot velocities in another figure
+joint_velocities = []
+for motor_id in range(num_motors):
+    dq_motor = [sample["motor_states"][motor_id]["actual_dq"] for sample in lowstate]
+    joint_velocities.append(dq_motor)   
+plt.figure(figsize=(12, 8))
+for motor_id in range(num_motors):
+    plt.plot(times, joint_velocities[motor_id], label=f'Joint {motor_id}')  
+plt.xlabel('Time (s)')
+plt.ylabel('Joint Velocity (rad/s)')
+plt.title('Recorded Joint Velocities Over Time')
+plt.legend(loc='best', ncol=2)
+plt.grid(True)
+plt.tight_layout()
+plt.show()
