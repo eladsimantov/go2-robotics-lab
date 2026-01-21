@@ -27,3 +27,11 @@ the command:
   .venv/bin/python plot_recorded_joints.py
   ```
 - This will generate plots of the recorded joint values over time with some low sampling rate specified in the record script.
+
+
+# How to run simulation with recorded data
+- Run the `simulateRecording.py` script to simulate the robot using the recorded data:
+  ```bash
+  .venv/bin/python /home/user_robodog/go2_lab/go2-robotics-lab/Go2py/simulateRecording.py
+  ```
+- This script will load the recorded data and simulate the robot's movements based on the recorded joint positions and velocities and feedforward torque estimates.
