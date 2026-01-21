@@ -47,3 +47,19 @@ plt.legend(loc='best', ncol=2)
 plt.grid(True)
 plt.tight_layout()
 plt.show()
+
+# Plot tau estimates in another figure
+joint_taus = []
+for motor_id in range(num_motors):
+    tau_motor = [sample["motor_states"][motor_id]["actual_tau_est"] for sample in lowstate]
+    joint_taus.append(tau_motor)   
+plt.figure(figsize=(12, 8))
+for motor_id in range(num_motors):
+    plt.plot(times, joint_taus[motor_id], label=f'Joint {motor_id}')  
+plt.xlabel('Time (s)')
+plt.ylabel('Joint Tau Estimate (Nm)')
+plt.title('Recorded Joint Tau Estimates Over Time')
+plt.legend(loc='best', ncol=2)
+plt.grid(True)
+plt.tight_layout()
+plt.show()

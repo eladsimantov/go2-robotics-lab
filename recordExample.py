@@ -20,7 +20,7 @@ joystick_records = []
 running = True
 last_sample_time = 0
 sample_interval = 0.01  # Sample every 0.01 seconds (100 Hz) - adjust as needed
-recording_duration = 10.0  # Set recording duration (in seconds)
+recording_duration = 20.0  # Set recording duration (in seconds)
 
 # We'll store the latest measured joint angles/vels and also the initial measured angles
 latest_q_meas = None

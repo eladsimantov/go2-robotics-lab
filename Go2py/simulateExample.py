@@ -1,17 +1,8 @@
-import pickle
 import numpy as np
 from Go2Py.sim.mujoco import Go2Sim
 from Go2Py.robot.model import Go2Model
 import time
 from scipy.spatial.transform import Rotation
-
-# Extract recorded data
-with open("/home/user_robodog/go2_lab/go2-robotics-lab/recordings/ShankHands_recorded_data_joystick.pkl", "rb") as f:
-    data = pickle.load(f)
-lowstate = data["lowstate"]
-print(f"Loaded {len(lowstate)} samples from recorded data.")
-print("First sample motor states:", lowstate[0]["motor_states"])
-print(lowstate)
 
 benben = Go2Model()
 
