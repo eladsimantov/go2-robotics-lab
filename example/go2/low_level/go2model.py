@@ -1,3 +1,5 @@
+import numpy as np
+
 class Go2LegModel:
     """
     This class represents a low-level kinematic and dynamic model of a Go2 Leg.
@@ -15,7 +17,16 @@ class Go2LegModel:
         self.L4 = 0.094  # Off-axis distance from Joint 1 (J1) to paw in meters
 
     def inverse_kinematics(self,target_pos):
-        pass
+        """
+        inverse_kinematics is a function that is based on the visualization in:
+        https://observablehq.com/@christophe-yamahata/inverse-kinematics-go2-robot
+        Note that the actual robot angles are not as defined there, so there is a step of conversion needed in convertAngs2Robot method
+        :param self: Go2LegModel class
+        :param target_pos: [x,y,z]^T vector of the leg endpoint with respect to the robot hip motor center 
+        """
+
+        # theta_1 = 
+        return np.array([theta_1,theta_2,theta_3])
 
     def forward_kinematics(self,joint_angles):
         pass

@@ -1,6 +1,10 @@
 # Go2 robotics lab guide
 https://technionmail-my.sharepoint.com/:w:/g/personal/elad_sim_campus_technion_ac_il/Ef72QWRYcENBmzYiVV5NYiEBjkLeh_eGHR1Cs_N47NDmQA?e=gtkrLU
 
+# ifconfig
+robotics lab -> enp1s0
+
+
 # unitree_sdk2_python
 Python interface for unitree sdk2
 
