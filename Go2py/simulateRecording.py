@@ -70,17 +70,17 @@ joint_taus = np.array(joint_taus)
 benben = Go2Model()
 
 def standExample(simTime: float = 5.0):
-    robot = Go2Sim()
+    robotSim = Go2Sim()
     qinit = np.array(joint_positions)[:,0]
 
     qstand = np.array([0.0, 0.67, -1.3, 0.0, 0.67, -1.3,
                         0.0, 0.67, -1.3, 0.0, 0.67, -1.3])
     qcrouch = np.array([0.0, 1.36, -2.65, 0.0, 1.36, -2.65,
                         -0.2, 1.36, -2.65, 0.2, 1.36, -2.65])
-    robot.standUpReset()
+    robotSim.standUpReset()
     start_time = time.time()
     step_counter = 0
-    state = robot.getJointStates()
+    state = robotSim.getJointStates()
     q0 = state['q']
     dq0 = state['dq']
     
@@ -96,15 +96,30 @@ def standExample(simTime: float = 5.0):
     
     while time.time()-start_time < simTime:
         time_percent = (time.time()-start_time)/simTime
-        state = robot.getJointStates()
+        state = robotSim.getJointStates()
         q = state['q']
 
-        translation, quat = robot.getPose()
+        translation, quat = robotSim.getPose()
         Rb = Rotation.from_quat([quat[1], quat[2], quat[3], quat[0]]).as_matrix()
         T = np.hstack([Rb, translation.reshape(3,1)])
         T = np.vstack([T, np.array([0., 0., 0., 1.])])
+        # print("Base pose Homogeneous Transformation: \n", T)
+        frames_dict = benben.forwardKinematics(T,q)
+        # for frame, pose in frames_dict.items():
+            # print(f"Frame: {frame}, Pose: {pose}")
+            # print("Feet positions: ", pose[:3,3])
+        feet_pos = np.hstack([frames_dict['FR_foot'][:3,3],
+                              frames_dict['FL_foot'][:3,3],
+                              frames_dict['RR_foot'][:3,3],
+                              frames_dict['RL_foot'][:3,3]])
+        q_model = benben.inverseKinematics(T, feet_pos)
+        # print("Model IK joint positions: ", q_model)
+        # print("Sim joint positions: ", q)
+        # print("Difference: ", q_model - q)
 
-        # q_des = benben.inverseKinematics(T, x)
+
+        # q_IK = benben.inverseKinematics(T, feet_pos)
+        # print("IK joint positions: ", q_IK)
         # q_des = qstand 
         # q_des = time_percent * qstand + (1-time_percent)*q0 
         # dq_des = np.zeros(12)
@@ -116,8 +131,8 @@ def standExample(simTime: float = 5.0):
         kp = 60.0*np.ones(12)
         kv = 5.0*np.ones(12)
         # tau_ff = np.zeros(12).reshape(12,1)
-        robot.setCommands(q_des=q_des, dq_des=dq_des, kp=kp, kv=kv, tau_ff=tau_ff)
-        robot.step()
+        robotSim.setCommands(q_des=q_des, dq_des=dq_des, kp=kp, kv=kv, tau_ff=tau_ff)
+        robotSim.step()
         
         # Maintain target framerate
         elapsed = time.time() - last_frame_time
