@@ -1,3 +1,38 @@
+"""
+This example demonstrates low-level control of the Go2 robot's leg joints to perform a shank hands motion.
+It is based on a simple stand example from the Unitree Go2 SDK, modified to follow the shake hands task.
+The task was recorded using a joystick command, and the recordExample.py script was used to capture both the 
+joint positions, velocities, and torques commanded AND the ones actually measured during the task execution.
+
+-------------------------------------------------------
+Shake Hands Task Description
+
+The task is divided into four states via a finite state machine (FSM):
+1. State 1: Standing upright position on four legs.
+2. State 2: Bended backwards pose of base link with shifted weight and COM between the three legs.
+3. State 3: Shake Hands state.
+4. State 4: Emergency stop to a safe position with low stiffness.
+
+The transitions between states are subject to the robot reaching a stable final target position. 
+1. Transition from S1 to S2: is_safe_base, four_contacts_on, is_starting.
+2. Transition from S2 to S3: is_safe_base, NOT FR_contact_on. Set is_starting to False.
+3. Transition from S3 to S2: is_safe_base, FR_contact_on.
+4. Transition from S2 to S1: is_safe_base, four_contacts_on, NOT is_starting.
+5. Transition from any state to S4: NOT is_safe_base.
+
+Conditions: 
+- is_safe_base: The base link's roll and pitch angles are within ±0.2 radians, and the joint velocities are below 1.0 rad/s.
+- four_contacts_on: All four feet have contact with the ground, indicated by foot force sensors exceeding TBD threshold.
+- FR_contact_on: The front-right foot has contact with the ground, indicated by foot force sensor exceeding TBD threshold.
+- is_starting: The sequence is initiated by student running the script (once).
+
+To transition smoothly between states, predetermined via points in task space are used, and the control is done in interpolations in joint space.
+All joints are controlled in position mode with specified stiffness (Kp) and damping (Kd) gains.
+The commanded joint positions, velocities, and torques were recorded using a joystick command and the recordExample.py script.
+---------------------------------------
+Author: Elad Siman Tov
+Date: 2026-01
+"""
 import time
 import sys
 
