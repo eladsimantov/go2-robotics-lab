@@ -1,40 +1,25 @@
 """
-This example demonstrates low-level control of the Go2 robot's leg joints to perform a shank hands motion.
-It is based on a simple stand example from the Unitree Go2 SDK, modified to follow the shake hands task.
-The task was recorded using a joystick command, and the recordExample.py script was used to capture both the 
-joint positions, velocities, and torques commanded AND the ones actually measured during the task execution.
+Low-level shake-hands example for the Go2 robot.
 
--------------------------------------------------------
-Shake Hands Task Description
+The controller follows the same publisher/subscriber pattern as the working stand example, but the
+motion logic is organized as a seven-phase sequence:
+1. Stand up from the default low-level posture.
+2. Lean backward into the support pose.
+3. Move the front-right leg into the shake-hands configuration.
+4. Hold the shake-hands pose and wave the front-right leg.
+5. Return the front-right leg back to the shake-hands configuration.
+6. Recover from the lean-back pose and stand back up.
+7. Return to the default low-level posture and stop.
 
-The task is divided into four states via a finite state machine (FSM):
-1. State 1: Standing upright position on four legs.
-2. State 2: Bended backwards pose of base link with shifted weight and COM between the three legs.
-3. State 3: Shake Hands state.
-4. State 4: Emergency stop to a safe position with low stiffness.
+Each phase uses joint-space interpolation with position control and simple gain scheduling.
 
-The transitions between states are subject to the robot reaching a stable final target position. 
-1. Transition from S1 to S2: is_safe_base, four_contacts_on, is_starting.
-2. Transition from S2 to S3: is_safe_base, NOT FR_contact_on. Set is_starting to False.
-3. Transition from S3 to S2: is_safe_base, FR_contact_on.
-4. Transition from S2 to S1: is_safe_base, four_contacts_on, NOT is_starting.
-5. Transition from any state to S4: NOT is_safe_base.
-
-Conditions: 
-- is_safe_base: The base link's roll and pitch angles are within ±0.2 radians, and the joint velocities are below 1.0 rad/s.
-- four_contacts_on: All four feet have contact with the ground, indicated by foot force sensors exceeding TBD threshold.
-- FR_contact_on: The front-right foot has contact with the ground, indicated by foot force sensor exceeding TBD threshold.
-- is_starting: The sequence is initiated by student running the script (once).
-
-To transition smoothly between states, predetermined via points in task space are used, and the control is done in interpolations in joint space.
-All joints are controlled in position mode with specified stiffness (Kp) and damping (Kd) gains.
-The commanded joint positions, velocities, and torques were recorded using a joystick command and the recordExample.py script.
 ---------------------------------------
 Author: Elad Siman Tov
 Date: 2026-01
 """
 import time
 import sys
+import numpy as np
 
 from unitree_sdk2py.core.channel import ChannelPublisher, ChannelFactoryInitialize
 from unitree_sdk2py.core.channel import ChannelSubscriber, ChannelFactoryInitialize
@@ -47,58 +32,82 @@ from unitree_sdk2py.utils.thread import RecurrentThread
 import unitree_legged_const as go2
 from unitree_sdk2py.comm.motion_switcher.motion_switcher_client import MotionSwitcherClient
 from unitree_sdk2py.go2.sport.sport_client import SportClient
+from trajGen import MinJerk
 
-class Custom:
+
+def to_unitree(theta_1, theta_2, theta_3):
+    return np.array([theta_1, -theta_2, -90.0 - theta_3])
+
+
+LEAN_BACK_Q_RAD = np.deg2rad([
+    -5.0, 35.0, -85.0,
+    -12.0, 30.0, -90.0,
+    -19.0, 40.0, -90.0,
+    -19.0, 40.0, -95.0,
+])
+
+SHAKE_HANDS_THETA_DEG = np.array([-9.0, 52.0, 20.0])
+SHAKE_HANDS_SINEAMP_RAD = np.deg2rad(15)
+SHAKE_HANDS_WAVE_FREQUENCY_HZ = 2.0
+
+STAND_UP_Q_RAD = np.array([0.0, 0.67, -1.3] * 4)
+STAND_DOWN_Q_RAD = np.array([
+    0.0473455, 1.22187, -2.44375, -0.0473455, 1.22187, -2.44375,
+    0.0473455, 1.22187, -2.44375, -0.0473455, 1.22187, -2.44375,
+])
+
+SHAKE_HANDS_Q_RAD = np.concatenate([
+    np.deg2rad(to_unitree(*SHAKE_HANDS_THETA_DEG)),
+    LEAN_BACK_Q_RAD[3:12],
+])
+
+standUp_Time = 3.0
+leanBack_Time = 2.0
+liftHand_Time = 2.0
+waveHand_Time = 3.0
+lowerHand_Time = 2.0
+leanBackReturn_Time = 2.0
+standDown_Time = 3.0
+
+SIM_TIME = (
+    standUp_Time
+    + leanBack_Time
+    + liftHand_Time
+    + waveHand_Time
+    + lowerHand_Time
+    + leanBackReturn_Time
+    + standDown_Time
+)
+
+class ShakeHands:
     def __init__(self):
         self.Kp = 60.0
         self.Kd = 5.0
-        self.time_consume = 0
-        self.rate_count = 0
-        self.sin_count = 0
-        self.motiontime = 0
-        self.dt = 0.002  # 0.001~0.01
+        self.dt = 0.002
 
-        self.low_cmd = unitree_go_msg_dds__LowCmd_()  
-        self.low_state = None  
-
-        self._targetPos_1 = [0.0, 1.36, -2.65, 0.0, 1.36, -2.65,
-                             -0.2, 1.36, -2.65, 0.2, 1.36, -2.65]
-        self._targetPos_2 = [0.0, 0.67, -1.3, 0.0, 0.67, -1.3,
-                             0.0, 0.67, -1.3, 0.0, 0.67, -1.3]
-        self._targetPos_3 = [-0.35, 1.36, -2.65, 0.35, 1.36, -2.65,
-                             -0.5, 1.36, -2.65, 0.5, 1.36, -2.65]
-
-        self.startPos = [0.0] * 12
-        self.duration_1 = 500
-        self.duration_2 = 500
-        self.duration_3 = 1000
-        self.duration_4 = 900
-        self.percent_1 = 0
-        self.percent_2 = 0
-        self.percent_3 = 0
-        self.percent_4 = 0
-
+        self.low_cmd = unitree_go_msg_dds__LowCmd_()
+        self.low_state = None
+        self.startPos = np.zeros(12)
         self.firstRun = True
-        self.done = False
+        self.running_time = 0.0
 
-        # thread handling
         self.lowCmdWriteThreadPtr = None
-
         self.crc = CRC()
 
-    # Public methods
+        self.standUp_traj = MinJerk(STAND_DOWN_Q_RAD, STAND_UP_Q_RAD, T=1.0)
+        self.leanBack_traj = MinJerk(STAND_UP_Q_RAD, LEAN_BACK_Q_RAD, T=1.0)
+        self.liftHand_traj = MinJerk(LEAN_BACK_Q_RAD, SHAKE_HANDS_Q_RAD, T=1.0)
+
     def Init(self):
         self.InitLowCmd()
 
-        # create publisher #
         self.lowcmd_publisher = ChannelPublisher("rt/lowcmd", LowCmd_)
         self.lowcmd_publisher.Init()
 
-        # create subscriber # 
         self.lowstate_subscriber = ChannelSubscriber("rt/lowstate", LowState_)
         self.lowstate_subscriber.Init(self.LowStateMessageHandler, 10)
 
-        self.sc = SportClient()  
+        self.sc = SportClient()
         self.sc.SetTimeout(5.0)
         self.sc.Init()
 
@@ -107,7 +116,7 @@ class Custom:
         self.msc.Init()
 
         status, result = self.msc.CheckMode()
-        while result['name']:
+        while result and result.get('name'):
             self.sc.StandDown()
             self.msc.ReleaseMode()
             status, result = self.msc.CheckMode()
@@ -115,19 +124,18 @@ class Custom:
 
     def Start(self):
         self.lowCmdWriteThreadPtr = RecurrentThread(
-            interval=0.002, target=self.LowCmdWrite, name="writebasiccmd"
+            interval=self.dt, target=self.LowCmdWrite, name="writebasiccmd"
         )
         self.lowCmdWriteThreadPtr.Start()
 
-    # Private methods
     def InitLowCmd(self):
-        self.low_cmd.head[0]=0xFE
-        self.low_cmd.head[1]=0xEF
+        self.low_cmd.head[0] = 0xFE
+        self.low_cmd.head[1] = 0xEF
         self.low_cmd.level_flag = 0xFF
         self.low_cmd.gpio = 0
         for i in range(20):
-            self.low_cmd.motor_cmd[i].mode = 0x01  # (PMSM) mode
-            self.low_cmd.motor_cmd[i].q= go2.PosStopF
+            self.low_cmd.motor_cmd[i].mode = 0x01
+            self.low_cmd.motor_cmd[i].q = go2.PosStopF
             self.low_cmd.motor_cmd[i].kp = 0
             self.low_cmd.motor_cmd[i].dq = go2.VelStopF
             self.low_cmd.motor_cmd[i].kd = 0
@@ -135,57 +143,99 @@ class Custom:
 
     def LowStateMessageHandler(self, msg: LowState_):
         self.low_state = msg
-        # print("FR_0 motor state: ", msg.motor_state[go2.LegID["FR_0"]])
-        # print("IMU state: ", msg.imu_state)
-        # print("Battery state: voltage: ", msg.power_v, "current: ", msg.power_a)
+
+    def _lerp(self, start, end, phase):
+        return (1.0 - phase) * start + phase * end
+
+    def _write_joint_command(self, q_des, kp_des, kd_des, dq_des=None, tau_des=0.0):
+        q_des = np.asarray(q_des, dtype=float)
+        kp_des = np.asarray(kp_des, dtype=float)
+        kd_des = np.asarray(kd_des, dtype=float)
+        if dq_des is None:
+            dq_des = np.zeros(12)
+        else:
+            dq_des = np.asarray(dq_des, dtype=float)
+
+        for i in range(12):
+            self.low_cmd.motor_cmd[i].q = float(q_des[i])
+            self.low_cmd.motor_cmd[i].kp = float(kp_des[i])
+            self.low_cmd.motor_cmd[i].dq = float(dq_des[i])
+            self.low_cmd.motor_cmd[i].kd = float(kd_des[i])
+            self.low_cmd.motor_cmd[i].tau = float(tau_des)
 
     def LowCmdWrite(self):
+        if self.low_state is None:
+            return
 
         if self.firstRun:
             for i in range(12):
                 self.startPos[i] = self.low_state.motor_state[i].q
             self.firstRun = False
 
-        self.percent_1 += 1.0 / self.duration_1
-        self.percent_1 = min(self.percent_1, 1)
-        if self.percent_1 < 1:
-            for i in range(12):
-                self.low_cmd.motor_cmd[i].q = (1 - self.percent_1) * self.startPos[i] + self.percent_1 * self._targetPos_1[i]
-                self.low_cmd.motor_cmd[i].dq = 0
-                self.low_cmd.motor_cmd[i].kp = self.Kp
-                self.low_cmd.motor_cmd[i].kd = self.Kd
-                self.low_cmd.motor_cmd[i].tau = 0
+        self.running_time += self.dt
 
-        if (self.percent_1 == 1) and (self.percent_2 <= 1):
-            self.percent_2 += 1.0 / self.duration_2
-            self.percent_2 = min(self.percent_2, 1)
-            for i in range(12):
-                self.low_cmd.motor_cmd[i].q = (1 - self.percent_2) * self._targetPos_1[i] + self.percent_2 * self._targetPos_2[i]
-                self.low_cmd.motor_cmd[i].dq = 0
-                self.low_cmd.motor_cmd[i].kp = self.Kp
-                self.low_cmd.motor_cmd[i].kd = self.Kd
-                self.low_cmd.motor_cmd[i].tau = 0
+        if self.running_time < standUp_Time:
+            phase = np.min([self.running_time / standUp_Time, 1.0])
+            q_des = self._lerp(self.startPos, STAND_UP_Q_RAD, phase)
+            kp_des = np.full(12, phase * 50.0 + (1 - phase) * 20.0)
+            kd_des = np.full(12, 3.5)
+            dq_des = np.zeros(12)
 
-        if (self.percent_1 == 1) and (self.percent_2 == 1) and (self.percent_3 < 1):
-            self.percent_3 += 1.0 / self.duration_3
-            self.percent_3 = min(self.percent_3, 1)
+        elif self.running_time < standUp_Time + leanBack_Time:
+            phase = np.min([(self.running_time - standUp_Time) / leanBack_Time, 1.0])
+            q_des = self._lerp(STAND_UP_Q_RAD, LEAN_BACK_Q_RAD, phase)
+            kp_des = 70.0 + phase * 30 * np.array([-1, -1, -1, 0, 1, 1, 0, 1, 1, 0, 1, 1])[0:12]
+            kd_des = np.full(12, 3.5)
+            q_des, v_des, _ = self.leanBack_traj.eval(t=phase)
+            dq_des = v_des
+        elif self.running_time < standUp_Time + leanBack_Time + liftHand_Time:
+            phase = np.min([(self.running_time - standUp_Time - leanBack_Time) / liftHand_Time, 1.0])
+            q_des, v_des, _ = self.liftHand_traj.eval(t=phase)
+            kp_des = np.array([15, 15, 15, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
+            kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
+            dq_des = v_des
+        elif self.running_time < standUp_Time + leanBack_Time + liftHand_Time + waveHand_Time:
+            phase = np.min([(self.running_time - standUp_Time - leanBack_Time - liftHand_Time) / waveHand_Time, 1.0])
+            q_des = SHAKE_HANDS_Q_RAD.copy()
+            q_des[2] = SHAKE_HANDS_Q_RAD[2] + SHAKE_HANDS_SINEAMP_RAD * np.sin(
+                2.0 * np.pi * SHAKE_HANDS_WAVE_FREQUENCY_HZ * phase
+            )
+            kp_des = np.array([15, 15, 15, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
+            kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
+            q_des, v_des, _ = self.liftHand_traj.eval(t=1.0)
+            dq_des = v_des
+            q_des[2] = SHAKE_HANDS_Q_RAD[2] + SHAKE_HANDS_SINEAMP_RAD * np.sin(2*np.pi*2*phase)
+        elif self.running_time < standUp_Time + leanBack_Time + 2*liftHand_Time + waveHand_Time:
+            phase = np.min([(self.running_time - standUp_Time - leanBack_Time - liftHand_Time - waveHand_Time) / liftHand_Time, 1.0])
+            q_des, v_des, _ = self.liftHand_traj.eval(t=1.0 - phase)
+            kp_des = np.array([15, 15, 15, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
+            kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
+            dq_des = v_des
+        elif self.running_time < standUp_Time + 2*leanBack_Time + 2*liftHand_Time + waveHand_Time:
+            phase = np.min([(self.running_time - standUp_Time - leanBack_Time - 2*liftHand_Time - waveHand_Time) / leanBack_Time, 1.0])
+            q_des, v_des, _ = self.leanBack_traj.eval(t=1.0 - phase)
+            kp_des = 70.0 + (1-phase) * 30 * np.array([-1,-1,-1,0,1,1,0,1,1,0,1,1])[0:12]
+            kd_des = np.full(12, 3.5)
+            dq_des = v_des
+        elif self.running_time < 2*standUp_Time + 2*leanBack_Time + 2*liftHand_Time + waveHand_Time:
+            phase = np.min([(self.running_time - standUp_Time - 2*leanBack_Time - 2*liftHand_Time - waveHand_Time) / standUp_Time, 1.0])
+            q_des, v_des, _ = self.standUp_traj.eval(t=1.0 - phase)
+            kp_des = 30.0*phase + (1-phase)*70.0
+            kd_des = np.full(12, 3.5)
+            dq_des = v_des
+        else:
             for i in range(12):
-                self.low_cmd.motor_cmd[i].q = self._targetPos_2[i] 
-                self.low_cmd.motor_cmd[i].dq = 0
-                self.low_cmd.motor_cmd[i].kp = self.Kp
-                self.low_cmd.motor_cmd[i].kd = self.Kd
-                self.low_cmd.motor_cmd[i].tau = 0
+                self.low_cmd.motor_cmd[i].mode = 0x01
+                self.low_cmd.motor_cmd[i].q = 0.0
+                self.low_cmd.motor_cmd[i].kp = 0.0
+                self.low_cmd.motor_cmd[i].dq = 0.0
+                self.low_cmd.motor_cmd[i].kd = 0.0
+                self.low_cmd.motor_cmd[i].tau = 0.0
+            self.low_cmd.crc = self.crc.Crc(self.low_cmd)
+            self.lowcmd_publisher.Write(self.low_cmd)
+            return
 
-        if (self.percent_1 == 1) and (self.percent_2 == 1) and (self.percent_3 == 1) and (self.percent_4 <= 1):
-            self.percent_4 += 1.0 / self.duration_4
-            self.percent_4 = min(self.percent_4, 1)
-            for i in range(12):
-                self.low_cmd.motor_cmd[i].q = (1 - self.percent_4) * self._targetPos_2[i] + self.percent_4 * self._targetPos_3[i]
-                self.low_cmd.motor_cmd[i].dq = 0
-                self.low_cmd.motor_cmd[i].kp = self.Kp
-                self.low_cmd.motor_cmd[i].kd = self.Kd
-                self.low_cmd.motor_cmd[i].tau = 0
-
+        self._write_joint_command(q_des, kp_des, kd_des, dq_des=dq_des)
         self.low_cmd.crc = self.crc.Crc(self.low_cmd)
         self.lowcmd_publisher.Write(self.low_cmd)
 
@@ -194,18 +244,18 @@ if __name__ == '__main__':
     print("WARNING: Please ensure there are no obstacles around the robot while running this example.")
     input("Press Enter to continue...")
 
-    if len(sys.argv)>1:
+    if len(sys.argv) > 1:
         ChannelFactoryInitialize(0, sys.argv[1])
     else:
         ChannelFactoryInitialize(0)
 
-    custom = Custom()
-    custom.Init()
-    custom.Start()
+    shakehands = ShakeHands()
+    shakehands.Init()
+    shakehands.Start()
 
-    while True:        
-        if custom.percent_4 == 1.0: 
-           time.sleep(1)
-           print("Done!")
-           sys.exit(-1)     
+    while True:
+        if shakehands.running_time >= SIM_TIME:
+            time.sleep(1)
+            print("Done!")
+            sys.exit(0)
         time.sleep(1)
