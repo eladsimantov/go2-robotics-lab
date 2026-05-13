@@ -91,6 +91,9 @@ LEAN_BACK_Q_RAD = np.deg2rad([
     -19.0, 40.0, -95.0    # RL
 ])
 
+LIE_DOWN_Q_RAD = np.array([-0.35, 1.36, -2.65, 0.35, 1.36, -2.65,
+                             -0.5, 1.36, -2.65, 0.5, 1.36, -2.65])
+
 SHAKE_HANDS_THETA_DEG = np.array([-9.0, 52.0, 20.0])
 SHAKE_HANDS_SINEAMP_RAD = np.deg2rad(15)
 
@@ -116,6 +119,7 @@ crc = CRC()
 standUp_traj = MinJerk(STAND_DOWN_Q_RAD, STAND_UP_Q_RAD, T=1.0)
 leanBack_traj = MinJerk(STAND_UP_Q_RAD, LEAN_BACK_Q_RAD, T=1.0) # Time is treated as a phase percentage, so actual time is controlled in the loop
 liftHand_traj = MinJerk(LEAN_BACK_Q_RAD, SHAKE_HANDS_Q_RAD, T=1.0) # Placeholder, will update the trajectory points in the loop for lifting the hand
+ending_traj = MinJerk(STAND_DOWN_Q_RAD, LIE_DOWN_Q_RAD, T=1.0) # A rigid trajectory for lying down at the end.
 
 input("Press enter to start Lean Back")
 
@@ -264,8 +268,20 @@ if __name__ == '__main__':
                 cmd.motor_cmd[i].kd = 3.5 
                 cmd.motor_cmd[i].tau = 0.0
                 C.update(i, kp=cmd.motor_cmd[i].kp, kd=cmd.motor_cmd[i].kd, tau_ff=cmd.motor_cmd[i].tau, q_des=cmd.motor_cmd[i].q, dq_des=cmd.motor_cmd[i].dq)
+        elif (running_time < 2*standUp_Time + 2*leanBack_Time + 2*liftHand_Time + waveHand_Time + 2.0):
+            # move to lying down position to reach damping mode
+            phase = np.min([(running_time - 2*standUp_Time - 2*leanBack_Time - 2*liftHand_Time - waveHand_Time)/2.0, 1.0])
+            q_des, __ , _ = ending_traj.eval(t=phase) # A rigid trajectory for lying down at the end.
+            for i in range(12):
+                cmd.motor_cmd[i].q = q_des[i]
+                cmd.motor_cmd[i].kp = 30.0 
+                cmd.motor_cmd[i].dq = 0.0
+                cmd.motor_cmd[i].kd = 3.5 
+                cmd.motor_cmd[i].tau = 0.0
+                C.update(i, kp=cmd.motor_cmd[i].kp, kd=cmd.motor_cmd[i].kd, tau_ff=cmd.motor_cmd[i].tau, q_des=cmd.motor_cmd[i].q, dq_des=cmd.motor_cmd[i].dq)
         else:
             for i in range(12):
+                # End in damping mode with zero kp and kd.
                 cmd.motor_cmd[i].mode = 0x01  # (PMSM) mode
                 cmd.motor_cmd[i].q = 0.0
                 cmd.motor_cmd[i].kp = 0.0

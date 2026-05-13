@@ -1,3 +1,18 @@
+"""
+This module implements a multivariate minimum jerk trajectory generator for smooth motion planning.
+The MinJerk class computes a 5th-order polynomial trajectory that minimizes jerk (the derivative
+of acceleration) between specified start and end conditions. It supports arbitrary dimensions,
+making it suitable for any multi-DOF system, both in joint space and task space. 
+The trajectory can be evaluated at any time point, returning position, velocity, and acceleration.
+
+You can import this class into your project and use it to generate smooth trajectories for any application.
+You can also run this as a script to visualize the trajectory profiles for a 3D example. 
+
+Author: Elad Siman Tov
+Date: May 2026
+Advanced Robotics Lab, Mechanical Engineering, Technion.
+"""
+
 import numpy as np
 
 class MinJerk:

@@ -61,7 +61,7 @@ SHAKE_HANDS_Q_RAD = np.concatenate([
     LEAN_BACK_Q_RAD[3:12],
 ])
 
-standUp_Time = 3.0
+standUp_Time = 2.0
 leanBack_Time = 2.0
 liftHand_Time = 2.0
 waveHand_Time = 3.0
@@ -191,7 +191,7 @@ class ShakeHands:
         elif self.running_time < standUp_Time + leanBack_Time + liftHand_Time:
             phase = np.min([(self.running_time - standUp_Time - leanBack_Time) / liftHand_Time, 1.0])
             q_des, v_des, _ = self.liftHand_traj.eval(t=phase)
-            kp_des = np.array([15, 15, 15, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
+            kp_des = np.array([20, 20, 20, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
             kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
             dq_des = v_des
         elif self.running_time < standUp_Time + leanBack_Time + liftHand_Time + waveHand_Time:
@@ -200,7 +200,7 @@ class ShakeHands:
             q_des[2] = SHAKE_HANDS_Q_RAD[2] + SHAKE_HANDS_SINEAMP_RAD * np.sin(
                 2.0 * np.pi * SHAKE_HANDS_WAVE_FREQUENCY_HZ * phase
             )
-            kp_des = np.array([15, 15, 15, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
+            kp_des = np.array([20, 20, 20, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
             kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
             q_des, v_des, _ = self.liftHand_traj.eval(t=1.0)
             dq_des = v_des
@@ -208,7 +208,7 @@ class ShakeHands:
         elif self.running_time < standUp_Time + leanBack_Time + 2*liftHand_Time + waveHand_Time:
             phase = np.min([(self.running_time - standUp_Time - leanBack_Time - liftHand_Time - waveHand_Time) / liftHand_Time, 1.0])
             q_des, v_des, _ = self.liftHand_traj.eval(t=1.0 - phase)
-            kp_des = np.array([15, 15, 15, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
+            kp_des = np.array([20, 20, 20, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
             kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
             dq_des = v_des
         elif self.running_time < standUp_Time + 2*leanBack_Time + 2*liftHand_Time + waveHand_Time:
@@ -223,6 +223,7 @@ class ShakeHands:
             kp_des = 30.0*phase + (1-phase)*70.0
             kd_des = np.full(12, 3.5)
             dq_des = v_des
+            # dq_des = np.zeros(12)
         else:
             for i in range(12):
                 self.low_cmd.motor_cmd[i].mode = 0x01
