@@ -49,7 +49,17 @@ def standExample(simTime: float = 5.0):
 # qup = benben.inverseKinematics(Tbase,Xlegs)
 
 if __name__ == "__main__":
-    standExample(simTime=5) # simulate standing up for 5 seconds
+    # standExample(simTime=5) # simulate standing up for 5 seconds
+    STAND_DOWN_Q_RAD = np.array([
+        0.129, 1.22187, -2.72, -0.129, 1.22187, -2.72, 0.129,
+        1.22187, -2.72, -0.129, 1.22187, -2.72
+    ])
+    Tbase = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,1,1]])
+    STAND_UP_Q_RAD = np.array([0.0, 0.67, -1.3] * 4)
+
+    # Xlegs = np.array([0,0,0,0,0,0,0,0,0,0,0,0])
+    Xlegs = benben.forwardKinematics(Tbase, STAND_UP_Q_RAD)
+    print(Xlegs)
     print("L1 = " + str(benben.l1))
     print("L2 = " + str(benben.l2))
     print("L3 = " + str(benben.l3))

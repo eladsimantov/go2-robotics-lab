@@ -84,6 +84,13 @@ def HighStateMessageHandler(msg: SportModeState_):
 C  = ControlParametersMIMO()
 
 # --- Constants & Setup ---
+# LEAN_BACK_Q_RAD = np.deg2rad([
+#     0.0,  27.0, -89.0,   # FR
+#     0.0,  19.0, -68.0,   # FL
+#     0.0,  19.0, -68.0,   # RR
+#     0.0,  19.0, -68.0    # RL
+# ])
+
 LEAN_BACK_Q_RAD = np.deg2rad([
     -5.0,  35.0, -85.0,   # FR
     -12.0, 30.0, -90.0,   # FL
@@ -124,9 +131,20 @@ ending_traj = MinJerk(STAND_DOWN_Q_RAD, LIE_DOWN_Q_RAD, T=1.0) # A rigid traject
 input("Press enter to start Lean Back")
 
 if __name__ == '__main__':
-    if len(sys.argv) <2:
+    if len(sys.argv) < 2:
+        """
+        If no interface is given, by default we will initialize the channel to use the simulation 
+        interface. To use on the real robot, please provide the interface name (e.g., python3 go2_shake_hands.py enp0s31f6) in the command line argument.
+        """
+        ChannelFactoryInitialize(1, "lo")
+    elif sys.argv[1] == "lo":
         ChannelFactoryInitialize(1, "lo")
     else:
+        """
+        Initiallize the channel with the provided interface name. 
+        For example, if the robot is connected to the computer via an Ethernet cable, 
+        the interface name is likely to be "enp0s31f6" or similar. You can check your network interfaces using the command `ip addr` or `ifconfig` in the terminal.
+        """
         ChannelFactoryInitialize(0, sys.argv[1])
     
     # create subscriber to receive LowState messages
