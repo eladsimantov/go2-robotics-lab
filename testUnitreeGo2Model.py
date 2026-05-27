@@ -2,8 +2,11 @@
 
 
 if __name__ == '__main__':
-    import unitree_sdk2py
-    print("imported unitree python sdk successfully")
+    try:
+        import unitree_sdk2py
+        print("imported unitree python sdk successfully")
+    except ImportError:
+        print("unitree python sdk not available (skipping sdk print)")
     import numpy as np
     from unitreeGo2Model import forward_kinematics, inverse_kinematics, standing_configuration
     print("imported unitreeGo2Model successfully")
@@ -28,6 +31,10 @@ if __name__ == '__main__':
     )
     print("IK success:", success)
     print("IK iterations:", iterations)
-    print("IK solution (radians):", q_sol[7:19])
-    print("IK solution (degrees):", np.degrees(q_sol[7:19]))
-    print("Initial configuration (degrees):", np.degrees(q0[7:19]))
+    
+    q_sol_joints = q_sol[7:19] if q_sol.size == 19 else q_sol
+    q0_joints = q0[7:19] if q0.size == 19 else q0
+    
+    print("IK solution (radians):", q_sol_joints)
+    print("IK solution (degrees):", np.degrees(q_sol_joints))
+    print("Initial configuration (degrees):", np.degrees(q0_joints))
