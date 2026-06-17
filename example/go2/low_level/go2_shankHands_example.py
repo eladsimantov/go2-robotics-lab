@@ -48,7 +48,7 @@ LEAN_BACK_BASE_RPY = np.array([0.091, -0.052, -0.057])  # Roll=5.2 deg, Pitch=-3
 try:
     import os
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))
-    from unitreeGo2Model import forward_kinematics, inverse_kinematics, standing_configuration
+    from unitreeGo2Model import forward_kinematics, inverse_kinematics, standing_configuration, unitree_joints_from_full_configuration
     
     # Calculate LEAN_BACK_Q_RAD dynamically using analytical IK
     q0_joints = standing_configuration()
@@ -69,7 +69,7 @@ try:
     )
     
     if success:
-        LEAN_BACK_Q_RAD = q_sol
+        LEAN_BACK_Q_RAD = unitree_joints_from_full_configuration(q_sol)
         print("Successfully calculated LEAN_BACK_Q_RAD dynamically via analytical IK:")
         print("  LEAN_BACK_Q_RAD (deg):", np.degrees(LEAN_BACK_Q_RAD))
     else:
