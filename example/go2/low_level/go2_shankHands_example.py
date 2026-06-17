@@ -39,12 +39,47 @@ def to_unitree(theta_1, theta_2, theta_3):
     return np.array([theta_1, -theta_2, -90.0 - theta_3])
 
 
-LEAN_BACK_Q_RAD = np.deg2rad([
-    -5.0, 35.0, -85.0,
-    -12.0, 30.0, -90.0,
-    -19.0, 40.0, -90.0,
-    -19.0, 40.0, -95.0,
-])
+# Base pose parameters for Leaning Back
+LEAN_BACK_BASE_POS = np.array([-0.06, 0.0, 0.25])     # Shifted backward by 6cm, height lowered to 25cm
+LEAN_BACK_BASE_RPY = np.array([-0.034, -0.34, 0.0])   # Roll=-2 deg, Pitch=-20 deg (pitched up), Yaw=0 deg
+
+try:
+    import os
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))
+    from unitreeGo2Model import forward_kinematics, inverse_kinematics, standing_configuration
+    
+    # Calculate LEAN_BACK_Q_RAD dynamically using analytical IK
+    q0_joints = standing_configuration()
+    start_pos = np.array([0.0, 0.0, 0.28])     # Standing height of 28cm
+    start_rpy = np.array([0.0, 0.0, 0.0])      # No rotation
+    
+    planted_feet_world = forward_kinematics(
+        configuration=q0_joints,
+        base_position=start_pos,
+        base_rpy=start_rpy
+    )
+    
+    success, _, q_sol = inverse_kinematics(
+        target_positions=planted_feet_world,
+        initial_configuration=q0_joints,
+        base_position=LEAN_BACK_BASE_POS,
+        base_rpy=LEAN_BACK_BASE_RPY
+    )
+    
+    if success:
+        LEAN_BACK_Q_RAD = q_sol
+        print("Successfully calculated LEAN_BACK_Q_RAD dynamically via analytical IK:")
+        print("  LEAN_BACK_Q_RAD (deg):", np.degrees(LEAN_BACK_Q_RAD))
+    else:
+        raise ValueError("IK calculation failed to converge.")
+except Exception as e:
+    print(f"Failed to calculate LEAN_BACK_Q_RAD dynamically ({e}). Using default fallback values.")
+    LEAN_BACK_Q_RAD = np.deg2rad([
+        -5.0, 35.0, -85.0,
+        -12.0, 30.0, -90.0,
+        -19.0, 40.0, -90.0,
+        -19.0, 40.0, -95.0,
+    ])
 
 LIE_DOWN_Q_RAD = np.array([-0.35, 1.36, -2.65, 0.35, 1.36, -2.65,
                              -0.5, 1.36, -2.65, 0.5, 1.36, -2.65])
