@@ -42,8 +42,8 @@ def to_unitree(theta_1, theta_2, theta_3):
 # Base pose parameters for Leaning Back (extracted from the working manual configuration)
 # This includes a shift to the left (y = 4.7cm) and a roll to the left (roll = 5.2 deg)
 # to shift the center of mass over the FL-RR-RL support triangle before lifting the FR leg.
-LEAN_BACK_BASE_POS = np.array([-0.065, 0.047, 0.233])
-LEAN_BACK_BASE_RPY = np.array([0.091, -0.052, -0.057])  # Roll=5.2 deg, Pitch=-3.0 deg, Yaw=-3.3 deg
+LEAN_BACK_BASE_POS = np.array([-0.065, 0.001, 0.233])
+LEAN_BACK_BASE_RPY = np.array([0.000, -0.058, 0.00])  # Roll=5.2 deg, Pitch=-3.0 deg, Yaw=-3.3 deg
 
 try:
     import os
