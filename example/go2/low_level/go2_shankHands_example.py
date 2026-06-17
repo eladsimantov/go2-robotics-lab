@@ -46,6 +46,9 @@ LEAN_BACK_Q_RAD = np.deg2rad([
     -19.0, 40.0, -95.0,
 ])
 
+LIE_DOWN_Q_RAD = np.array([-0.35, 1.36, -2.65, 0.35, 1.36, -2.65,
+                             -0.5, 1.36, -2.65, 0.5, 1.36, -2.65])
+
 SHAKE_HANDS_THETA_DEG = np.array([-9.0, 52.0, 20.0])
 SHAKE_HANDS_SINEAMP_RAD = np.deg2rad(15)
 SHAKE_HANDS_WAVE_FREQUENCY_HZ = 2.0
@@ -61,13 +64,15 @@ SHAKE_HANDS_Q_RAD = np.concatenate([
     LEAN_BACK_Q_RAD[3:12],
 ])
 
-standUp_Time = 2.0
+standUp_Time = 3.0
 leanBack_Time = 2.0
 liftHand_Time = 2.0
 waveHand_Time = 3.0
 lowerHand_Time = 2.0
 leanBackReturn_Time = 2.0
 standDown_Time = 3.0
+lieDown_Time = 2.0
+damping_Time = 3.0
 
 SIM_TIME = (
     standUp_Time
@@ -77,6 +82,8 @@ SIM_TIME = (
     + lowerHand_Time
     + leanBackReturn_Time
     + standDown_Time
+    + lieDown_Time
+    + damping_Time
 )
 
 class ShakeHands:
@@ -97,6 +104,7 @@ class ShakeHands:
         self.standUp_traj = MinJerk(STAND_DOWN_Q_RAD, STAND_UP_Q_RAD, T=1.0)
         self.leanBack_traj = MinJerk(STAND_UP_Q_RAD, LEAN_BACK_Q_RAD, T=1.0)
         self.liftHand_traj = MinJerk(LEAN_BACK_Q_RAD, SHAKE_HANDS_Q_RAD, T=1.0)
+        self.ending_traj = MinJerk(STAND_DOWN_Q_RAD, LIE_DOWN_Q_RAD, T=1.0)
 
     def Init(self):
         self.InitLowCmd()
@@ -174,56 +182,73 @@ class ShakeHands:
 
         self.running_time += self.dt
 
-        if self.running_time < standUp_Time:
+        # Define time boundaries for each phase
+        t1 = standUp_Time
+        t2 = t1 + leanBack_Time
+        t3 = t2 + liftHand_Time
+        t4 = t3 + waveHand_Time
+        t5 = t4 + lowerHand_Time
+        t6 = t5 + leanBackReturn_Time
+        t7 = t6 + standDown_Time
+        t8 = t7 + lieDown_Time
+
+        if self.running_time < t1:
             phase = np.min([self.running_time / standUp_Time, 1.0])
             q_des = self._lerp(self.startPos, STAND_UP_Q_RAD, phase)
             kp_des = np.full(12, phase * 50.0 + (1 - phase) * 20.0)
             kd_des = np.full(12, 3.5)
             dq_des = np.zeros(12)
 
-        elif self.running_time < standUp_Time + leanBack_Time:
-            phase = np.min([(self.running_time - standUp_Time) / leanBack_Time, 1.0])
-            q_des = self._lerp(STAND_UP_Q_RAD, LEAN_BACK_Q_RAD, phase)
-            kp_des = 70.0 + phase * 30 * np.array([-1, -1, -1, 0, 1, 1, 0, 1, 1, 0, 1, 1])[0:12]
-            kd_des = np.full(12, 3.5)
+        elif self.running_time < t2:
+            phase = np.min([(self.running_time - t1) / leanBack_Time, 1.0])
             q_des, v_des, _ = self.leanBack_traj.eval(t=phase)
+            kp_des = 70.0 + phase * 30.0 * np.array([-1, -1, -1, 0, 1, 1, 0, 1, 1, 0, 1, 1])
+            kd_des = np.full(12, 3.5)
             dq_des = v_des
-        elif self.running_time < standUp_Time + leanBack_Time + liftHand_Time:
-            phase = np.min([(self.running_time - standUp_Time - leanBack_Time) / liftHand_Time, 1.0])
+
+        elif self.running_time < t3:
+            phase = np.min([(self.running_time - t2) / liftHand_Time, 1.0])
             q_des, v_des, _ = self.liftHand_traj.eval(t=phase)
-            kp_des = np.array([20, 20, 20, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
+            kp_des = np.array([15, 15, 15, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
             kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
             dq_des = v_des
-        elif self.running_time < standUp_Time + leanBack_Time + liftHand_Time + waveHand_Time:
-            phase = np.min([(self.running_time - standUp_Time - leanBack_Time - liftHand_Time) / waveHand_Time, 1.0])
-            q_des = SHAKE_HANDS_Q_RAD.copy()
-            q_des[2] = SHAKE_HANDS_Q_RAD[2] + SHAKE_HANDS_SINEAMP_RAD * np.sin(
-                2.0 * np.pi * SHAKE_HANDS_WAVE_FREQUENCY_HZ * phase
-            )
-            kp_des = np.array([20, 20, 20, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
+
+        elif self.running_time < t4:
+            phase = np.min([(self.running_time - t3) / waveHand_Time, 1.0])
+            q_des, _, _ = self.liftHand_traj.eval(t=1.0)
+            q_des[2] += SHAKE_HANDS_SINEAMP_RAD * np.sin(2.0 * np.pi * SHAKE_HANDS_WAVE_FREQUENCY_HZ * phase)
+            kp_des = np.array([15, 15, 15, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
             kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
-            q_des, v_des, _ = self.liftHand_traj.eval(t=1.0)
-            dq_des = v_des
-            q_des[2] = SHAKE_HANDS_Q_RAD[2] + SHAKE_HANDS_SINEAMP_RAD * np.sin(2*np.pi*2*phase)
-        elif self.running_time < standUp_Time + leanBack_Time + 2*liftHand_Time + waveHand_Time:
-            phase = np.min([(self.running_time - standUp_Time - leanBack_Time - liftHand_Time - waveHand_Time) / liftHand_Time, 1.0])
+            dq_des = np.zeros(12)
+
+        elif self.running_time < t5:
+            phase = np.min([(self.running_time - t4) / lowerHand_Time, 1.0])
             q_des, v_des, _ = self.liftHand_traj.eval(t=1.0 - phase)
-            kp_des = np.array([20, 20, 20, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
+            kp_des = np.array([15, 15, 15, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
             kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
             dq_des = v_des
-        elif self.running_time < standUp_Time + 2*leanBack_Time + 2*liftHand_Time + waveHand_Time:
-            phase = np.min([(self.running_time - standUp_Time - leanBack_Time - 2*liftHand_Time - waveHand_Time) / leanBack_Time, 1.0])
+
+        elif self.running_time < t6:
+            phase = np.min([(self.running_time - t5) / leanBackReturn_Time, 1.0])
             q_des, v_des, _ = self.leanBack_traj.eval(t=1.0 - phase)
-            kp_des = 70.0 + (1-phase) * 30 * np.array([-1,-1,-1,0,1,1,0,1,1,0,1,1])[0:12]
+            kp_des = 70.0 + (1.0 - phase) * 30.0 * np.array([-1, -1, -1, 0, 1, 1, 0, 1, 1, 0, 1, 1])
             kd_des = np.full(12, 3.5)
             dq_des = v_des
-        elif self.running_time < 2*standUp_Time + 2*leanBack_Time + 2*liftHand_Time + waveHand_Time:
-            phase = np.min([(self.running_time - standUp_Time - 2*leanBack_Time - 2*liftHand_Time - waveHand_Time) / standUp_Time, 1.0])
+
+        elif self.running_time < t7:
+            phase = np.min([(self.running_time - t6) / standDown_Time, 1.0])
             q_des, v_des, _ = self.standUp_traj.eval(t=1.0 - phase)
-            kp_des = 30.0*phase + (1-phase)*70.0
+            kp_des = np.full(12, 30.0 * phase + (1.0 - phase) * 70.0)
             kd_des = np.full(12, 3.5)
             dq_des = v_des
-            # dq_des = np.zeros(12)
+
+        elif self.running_time < t8:
+            phase = np.min([(self.running_time - t7) / lieDown_Time, 1.0])
+            q_des, _, _ = self.ending_traj.eval(t=phase)
+            kp_des = np.full(12, 30.0)
+            kd_des = np.full(12, 3.5)
+            dq_des = np.zeros(12)
+
         else:
             for i in range(12):
                 self.low_cmd.motor_cmd[i].mode = 0x01
