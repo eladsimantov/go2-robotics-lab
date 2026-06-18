@@ -42,8 +42,8 @@ def to_unitree(theta_1, theta_2, theta_3):
 # Base pose parameters for Leaning Back (extracted from the working manual configuration)
 # This includes a shift to the left (y = 4.7cm) and a roll to the left (roll = 5.2 deg)
 # to shift the center of mass over the FL-RR-RL support triangle before lifting the FR leg.
-LEAN_BACK_BASE_POS = np.array([-0.065, 0.001, 0.233])
-LEAN_BACK_BASE_RPY = np.array([0.000, -0.058, 0.00])  # Roll=5.2 deg, Pitch=-3.0 deg, Yaw=-3.3 deg
+LEAN_BACK_BASE_POS = np.array([-0.055, 0.06, 0.26]) # x-forward, y-left, z-up (relative to the standing pose)
+LEAN_BACK_BASE_RPY = np.array([0.07, -0.07, -0.057])  # Roll=5.2 deg, Pitch=-3.0 deg, Yaw=-3.3 deg
 
 try:
     import os
@@ -90,7 +90,7 @@ SHAKE_HANDS_THETA_DEG = np.array([-9.0, 52.0, 20.0])
 SHAKE_HANDS_SINEAMP_RAD = np.deg2rad(15)
 SHAKE_HANDS_WAVE_FREQUENCY_HZ = 2.0
 
-STAND_UP_Q_RAD = np.array([0.0, 0.67, -1.3] * 4)
+STAND_UP_Q_RAD = np.array([-0.08, 0.67, -1.3, 0.08, 0.67, -1.3, -0.08, 0.67, -1.3, 0.08, 0.67, -1.3])
 STAND_DOWN_Q_RAD = np.array([
     0.0473455, 1.22187, -2.44375, -0.0473455, 1.22187, -2.44375,
     0.0473455, 1.22187, -2.44375, -0.0473455, 1.22187, -2.44375,
@@ -124,7 +124,8 @@ SIM_TIME = (
 )
 
 class ShakeHands:
-    def __init__(self):
+    def __init__(self, is_simulation: bool = False):
+        self.is_simulation = is_simulation
         self.Kp = 60.0
         self.Kd = 5.0
         self.dt = 0.002
@@ -152,20 +153,21 @@ class ShakeHands:
         self.lowstate_subscriber = ChannelSubscriber("rt/lowstate", LowState_)
         self.lowstate_subscriber.Init(self.LowStateMessageHandler, 10)
 
-        self.sc = SportClient()
-        self.sc.SetTimeout(5.0)
-        self.sc.Init()
+        if not self.is_simulation:
+            self.sc = SportClient()
+            self.sc.SetTimeout(5.0)
+            self.sc.Init()
 
-        self.msc = MotionSwitcherClient()
-        self.msc.SetTimeout(5.0)
-        self.msc.Init()
+            self.msc = MotionSwitcherClient()
+            self.msc.SetTimeout(5.0)
+            self.msc.Init()
 
-        status, result = self.msc.CheckMode()
-        while result and result.get('name'):
-            self.sc.StandDown()
-            self.msc.ReleaseMode()
             status, result = self.msc.CheckMode()
-            time.sleep(1)
+            while result and result.get('name'):
+                self.sc.StandDown()
+                self.msc.ReleaseMode()
+                status, result = self.msc.CheckMode()
+                time.sleep(1)
 
     def Start(self):
         self.lowCmdWriteThreadPtr = RecurrentThread(
@@ -307,12 +309,17 @@ if __name__ == '__main__':
     print("WARNING: Please ensure there are no obstacles around the robot while running this example.")
     input("Press Enter to continue...")
 
-    if len(sys.argv) > 1:
-        ChannelFactoryInitialize(0, sys.argv[1])
+    is_sim = False
+    if len(sys.argv) < 2:
+        ChannelFactoryInitialize(1, "lo")
+        is_sim = True
+    elif sys.argv[1] == "lo":
+        ChannelFactoryInitialize(1, "lo")
+        is_sim = True
     else:
-        ChannelFactoryInitialize(0)
+        ChannelFactoryInitialize(0, sys.argv[1])
 
-    shakehands = ShakeHands()
+    shakehands = ShakeHands(is_simulation=is_sim)
     shakehands.Init()
     shakehands.Start()
 
