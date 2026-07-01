@@ -93,6 +93,7 @@ __all__ = [
     "neutral_configuration",
     "full_configuration_from_unitree_joints",
     "unitree_joints_from_full_configuration",
+    "is_contact",
 ]
 
 
@@ -998,6 +999,27 @@ def inverse_kinematics(
         eps=eps,
         frame_name=frame_name or "FL_foot",
     )
+
+
+def is_contact(msg, leg, threshold=20) -> bool:
+    """
+    Checks if a leg is in contact with the ground.
+
+    Args:
+        msg: LowState message from the robot containing sensor values.
+        leg (str or int): Leg name (e.g. 'FR', 'FL', 'RR', 'RL') or index (0-3).
+        threshold (float): Sensor force threshold above which leg is considered in contact.
+    """
+    if isinstance(leg, str):
+        leg_indices = {"FR": 0, "FL": 1, "RR": 2, "RL": 3}
+        leg_key = leg[:2].upper()
+        if leg_key not in leg_indices:
+            raise ValueError(f"Invalid leg name '{leg}'. Must start with FR, FL, RR, or RL.")
+        idx = leg_indices[leg_key]
+    else:
+        idx = int(leg)
+
+    return bool(msg.foot_force[idx] > threshold)
 
 
 def main():

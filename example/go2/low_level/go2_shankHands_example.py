@@ -48,7 +48,7 @@ LEAN_BACK_BASE_RPY = np.array([0.07, -0.07, -0.057])  # Roll=5.2 deg, Pitch=-3.0
 try:
     import os
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))
-    from unitreeGo2Model import forward_kinematics, inverse_kinematics, standing_configuration, unitree_joints_from_full_configuration
+    from unitreeGo2Model import forward_kinematics, inverse_kinematics, standing_configuration, unitree_joints_from_full_configuration, is_contact
     
     # Calculate LEAN_BACK_Q_RAD dynamically using analytical IK
     q0_joints = standing_configuration()
@@ -213,6 +213,15 @@ class ShakeHands:
     def LowCmdWrite(self):
         if self.low_state is None:
             return
+
+        # Print foot contact and force states every 0.5 seconds (250 steps)
+        if int(self.running_time / self.dt) % 250 == 0:
+            print(f"[Time: {self.running_time:.2f}s] Contacts -> "
+                  f"FR: {is_contact(self.low_state, 'FR')}, "
+                  f"FL: {is_contact(self.low_state, 'FL')}, "
+                  f"RR: {is_contact(self.low_state, 'RR')}, "
+                  f"RL: {is_contact(self.low_state, 'RL')} | "
+                  f"Forces: {[self.low_state.foot_force[i] for i in range(4)]}")
 
         if self.firstRun:
             for i in range(12):
