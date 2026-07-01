@@ -344,8 +344,21 @@ if __name__ == '__main__':
     shakehands.Start()
 
     while True:
-        if shakehands.running_time >= SIM_TIME:
+        try:
+            if shakehands.running_time >= SIM_TIME:
+                time.sleep(1)
+                print("Done!")
+                sys.exit(0)
             time.sleep(1)
-            print("Done!")
-            sys.exit(0)
-        time.sleep(1)
+        except KeyboardInterrupt:
+            for i in range(12):
+                shakehands.low_cmd.motor_cmd[i].mode = 0x01
+                shakehands.low_cmd.motor_cmd[i].q = 0.0
+                shakehands.low_cmd.motor_cmd[i].kp = 0.0
+                shakehands.low_cmd.motor_cmd[i].dq = 0.0
+                shakehands.low_cmd.motor_cmd[i].kd = 0.0
+                shakehands.low_cmd.motor_cmd[i].tau = 0.0
+            shakehands.low_cmd.crc = shakehands.crc.Crc(shakehands.low_cmd)
+            shakehands.lowcmd_publisher.Write(shakehands.low_cmd)
+            break
+            
