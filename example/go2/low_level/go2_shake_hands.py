@@ -50,7 +50,7 @@ try:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))
     from unitreeGo2Model import forward_kinematics, inverse_kinematics, standing_configuration, unitree_joints_from_full_configuration, is_contact
     
-    # Calculate LEAN_BACK_Q_RAD dynamically using analytical IK
+    # Calculate leanBack_q_rad dynamically using analytical IK
     q0_joints = standing_configuration()
     start_pos = np.array([0.0, 0.0, 0.28])     # Standing height of 28cm
     start_rpy = np.array([0.0, 0.0, 0.0])      # No rotation
@@ -69,36 +69,37 @@ try:
     )
     
     if success:
-        LEAN_BACK_Q_RAD = unitree_joints_from_full_configuration(q_sol)
-        print("Successfully calculated LEAN_BACK_Q_RAD dynamically via analytical IK:")
-        print("  LEAN_BACK_Q_RAD (deg):", np.degrees(LEAN_BACK_Q_RAD))
+        leanBack_q_rad = unitree_joints_from_full_configuration(q_sol)
+        print("Successfully calculated leanBack_q_rad dynamically via analytical IK:")
+        print("  leanBack_q_rad (deg):", np.degrees(leanBack_q_rad))
     else:
         raise ValueError("IK calculation failed to converge.")
 except Exception as e:
-    print(f"Failed to calculate LEAN_BACK_Q_RAD dynamically ({e}). Using default fallback values.")
-    LEAN_BACK_Q_RAD = np.deg2rad([
+    print(f"Failed to calculate leanBack_q_rad dynamically ({e}). Using default fallback values.")
+    leanBack_q_rad = np.deg2rad([
         -5.0, 35.0, -85.0,
         -12.0, 30.0, -90.0,
         -19.0, 40.0, -90.0,
         -19.0, 40.0, -95.0,
     ])
 
-LIE_DOWN_Q_RAD = np.array([-0.35, 1.36, -2.65, 0.35, 1.36, -2.65,
+lieDown_q_rad = np.array([-0.35, 1.36, -2.65, 0.35, 1.36, -2.65,
                              -0.5, 1.36, -2.65, 0.5, 1.36, -2.65])
 
-SHAKE_HANDS_THETA_DEG = np.array([-20.0, 60.0, 20.0])
-SHAKE_HANDS_SINEAMP_RAD = np.deg2rad(20)
-SHAKE_HANDS_WAVE_FREQUENCY_HZ = 2.0
+shakeHands_thetaFR_deg = np.array([-20.0, 60.0, 20.0])
+shakeHands_qFR_rad = np.deg2rad(to_unitree(*shakeHands_thetaFR_deg))
+shakeHands_sinAmp_rad = np.deg2rad(20)
+shakeHands_nWaves = 2
 
-STAND_UP_Q_RAD = np.array([-0.04, 0.67, -1.3, 0.04, 0.67, -1.3, -0.04, 0.67, -1.3, 0.04, 0.67, -1.3])
-STAND_DOWN_Q_RAD = np.array([
+standUp_q_rad = np.array([-0.04, 0.67, -1.3, 0.04, 0.67, -1.3, -0.04, 0.67, -1.3, 0.04, 0.67, -1.3])
+standDown_q_rad = np.array([
     0.0473455, 1.22187, -2.44375, -0.0473455, 1.22187, -2.44375,
     0.0473455, 1.22187, -2.44375, -0.0473455, 1.22187, -2.44375,
 ])
 
-SHAKE_HANDS_Q_RAD = np.concatenate([
-    np.deg2rad(to_unitree(*SHAKE_HANDS_THETA_DEG)),
-    LEAN_BACK_Q_RAD[3:12],
+shakeHands_q_rad = np.concatenate([
+    shakeHands_qFR_rad,
+    leanBack_q_rad[3:12],
 ])
 speedFactor = 1.3  # Speed factor to adjust the duration of each phase
 standUp_Time = 3.0/speedFactor
@@ -139,10 +140,10 @@ class ShakeHands:
         self.lowCmdWriteThreadPtr = None
         self.crc = CRC()
 
-        self.standUp_traj = MinJerk(STAND_DOWN_Q_RAD, STAND_UP_Q_RAD, T=1.0)
-        self.leanBack_traj = MinJerk(STAND_UP_Q_RAD, LEAN_BACK_Q_RAD, T=1.0)
-        self.liftHand_traj = MinJerk(LEAN_BACK_Q_RAD, SHAKE_HANDS_Q_RAD, T=1.0)
-        self.ending_traj = MinJerk(STAND_DOWN_Q_RAD, LIE_DOWN_Q_RAD, T=1.0)
+        self.standUp_traj = MinJerk(standDown_q_rad, standUp_q_rad, T=1.0)
+        self.leanBack_traj = MinJerk(standUp_q_rad, leanBack_q_rad, T=1.0)
+        self.liftHand_traj = MinJerk(leanBack_q_rad, shakeHands_q_rad, T=1.0)
+        self.ending_traj = MinJerk(standDown_q_rad, lieDown_q_rad, T=1.0)
 
     def Init(self):
         self.InitLowCmd()
@@ -268,9 +269,9 @@ class ShakeHands:
         elif self.running_time < t4:
             phase = np.min([(self.running_time - t3) / waveHand_Time, 1.0])
             q_des, _, _ = self.liftHand_traj.eval(t=1.0)
-            q_des[0] += SHAKE_HANDS_SINEAMP_RAD/4 * np.sin(2.0 * np.pi * SHAKE_HANDS_WAVE_FREQUENCY_HZ * phase)
-            q_des[1] += SHAKE_HANDS_SINEAMP_RAD/4 * np.sin(2.0 * np.pi * SHAKE_HANDS_WAVE_FREQUENCY_HZ * phase)
-            q_des[2] += SHAKE_HANDS_SINEAMP_RAD * np.sin(2.0 * np.pi * SHAKE_HANDS_WAVE_FREQUENCY_HZ * phase)
+            q_des[0] += shakeHands_sinAmp_rad/4 * np.sin(2.0 * np.pi * shakeHands_nWaves * phase)
+            q_des[1] += shakeHands_sinAmp_rad/4 * np.sin(2.0 * np.pi * shakeHands_nWaves * phase)
+            q_des[2] += shakeHands_sinAmp_rad * np.sin(2.0 * np.pi * shakeHands_nWaves * phase)
             kp_des = np.array([15, 15, 15, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
             kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
             dq_des = np.zeros(12)
