@@ -86,7 +86,7 @@ except Exception as e:
 LIE_DOWN_Q_RAD = np.array([-0.35, 1.36, -2.65, 0.35, 1.36, -2.65,
                              -0.5, 1.36, -2.65, 0.5, 1.36, -2.65])
 
-SHAKE_HANDS_THETA_DEG = np.array([-9.0, 52.0, 20.0])
+SHAKE_HANDS_THETA_DEG = np.array([-9.0, 62.0, 20.0])
 SHAKE_HANDS_SINEAMP_RAD = np.deg2rad(25)
 SHAKE_HANDS_WAVE_FREQUENCY_HZ = 2.0
 
@@ -103,7 +103,7 @@ SHAKE_HANDS_Q_RAD = np.concatenate([
 
 standUp_Time = 3.0/1.3
 leanBack_Time = 2.0/1.3
-liftHand_Time = 2.0/1.3
+liftHand_Time = 2.0/1.5
 waveHand_Time = 3.0/1.3
 lowerHand_Time = 2.0/1.3
 leanBackReturn_Time = 2.0/1.3
