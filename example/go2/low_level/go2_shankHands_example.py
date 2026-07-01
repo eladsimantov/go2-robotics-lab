@@ -242,7 +242,7 @@ class ShakeHands:
 
         if self.running_time < t1:
             phase = np.min([self.running_time / standUp_Time, 1.0])
-            q_des = self._lerp(self.startPos, STAND_UP_Q_RAD, phase)
+            q_des, v_des, _ = self.standUp_traj.eval(t=phase)
             kp_des = np.full(12, phase * 50.0 + (1 - phase) * 20.0)
             kd_des = np.full(12, 3.5)
             dq_des = np.zeros(12)
