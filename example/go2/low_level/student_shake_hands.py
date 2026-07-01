@@ -1,28 +1,18 @@
 """
-Low-level shake-hands example for the Go2 robot.
+Advanced Robotics Lab - Unitree Go2 Quadruped Robot
+Lab Exercise: "Shake Hands" Low-Level Control (Student Template)
 
-The controller follows the same publisher/subscriber pattern as the working stand example, but the
-motion logic is organized as a seven-phase sequence:
-1. Stand up from the default low-level posture.
-2. Lean backward into the support pose by defining a task space endpoint.
-3. Move the front-right leg into the shake-hands configuration.
-4. Hold the shake-hands pose and wave the front-right leg.
-5. Return the front-right leg back to the shake-hands configuration.
-6. Recover from the lean-back pose and stand back up.
-7. Return to the default low-level posture and stop.
-
-Each phase uses joint-space interpolation with position control and simple gain scheduling.
-
----------------------------------------
 Author: Elad Siman Tov
 Date: 2026-07
 """
 import time
 import sys
+import os
 import numpy as np
 
+# System Imports (Abstracted for students)
 from unitree_sdk2py.core.channel import ChannelPublisher, ChannelFactoryInitialize
-from unitree_sdk2py.core.channel import ChannelSubscriber, ChannelFactoryInitialize
+from unitree_sdk2py.core.channel import ChannelSubscriber
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowState_
 from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_
@@ -34,21 +24,80 @@ from unitree_sdk2py.comm.motion_switcher.motion_switcher_client import MotionSwi
 from unitree_sdk2py.go2.sport.sport_client import SportClient
 from trajGen import MinJerk
 
-
 def to_unitree(theta_1, theta_2, theta_3):
+    """Converts local joint angles to Unitree joint offsets in degrees."""
     return np.array([theta_1, -theta_2, -90.0 - theta_3])
 
 
-# Base pose parameters for Leaning Back (extracted from the working manual configuration)
-# This includes a shift to the left (y = 4.7cm) and a roll to the left (roll = 5.2 deg)
-# to shift the center of mass over the FL-RR-RL support triangle before lifting the FR leg.
-leanBack_basePos_m = np.array([-0.055, 0.03, 0.23])   # x-forward, y-left, z-up (relative to the standing pose)
-leanBack_baseRpy_rad = np.array([0.00, -0.2, 0.1])  # Roll=5.2 deg, Pitch=-3.0 deg, Yaw=-3.3 deg
+# =====================================================================
+#             STUDENT CONFIGURATION BLOCK (FILL IN THE TASKS)
+# =====================================================================
 
+# --- QUESTION 2: Contact Sensory Feedback ---
+def is_contact(msg: LowState_, leg, threshold=12) -> bool:
+    """
+    Checks if a leg is in contact with the ground.
+    leg: 'FR', 'FL', 'RR', 'RL'
+    """
+    # ====== STUDENT TASK: Write logic here ======
+    # Hint: see msg.foot_force (FR is 0, FL is 1, RR is 2, RL is 3)
+    
+    # Students provide T/F output here:
+    # return False
+    
+    # [UNCOMMENT THE BELOW LOGIC TO TEST THE SOLUTION KEY]
+    leg_indices = {"FR": 0, "FL": 1, "RR": 2, "RL": 3}
+    idx = leg_indices[leg[:2].upper()]
+    return bool(msg.foot_force[idx] > threshold)
+
+
+# --- QUESTION 4: Lean Back State ---
+# Define base pose parameters for leaning back to shift COM before lifting FR leg
+# (x-forward, y-left, z-up relative to standing pose)
+leanBack_basePos_m = np.array([-0.055, 0.03, 0.23])   # TODO: Students fill 3x1 vector
+leanBack_baseRpy_rad = np.array([0.00, -0.2, 0.1])    # TODO: Students fill 3x1 RPY vector (radians)
+
+
+# --- QUESTION 5: Stiffness Directions (Phase 2 Gain Scheduling) ---
+# Directions of change in gains: {1} for increase, {-1} for decrease, {0} for no change.
+# Vector of length 12: [FR_hip, FR_thigh, FR_calf, FL_hip, FL_thigh, FL_calf, RR_hip...]
+phase2_kp_directions = np.array([
+    -1, -1, -1,  # FR leg (lifted/shake-hands leg)
+     0,  1,  1,  # FL leg (support leg)
+     0,  1,  1,  # RR leg (support leg)
+     0,  1,  1   # RL leg (support leg)
+])
+
+
+# --- QUESTION 6: Shake Hands Position ---
+# Leg joint angle vector (theta_1, theta_2, theta_3 in degrees) for the lifted leg
+shakeHands_thetaFR_deg = np.array([-20.0, 60.0, 20.0])  # TODO: Students fill 3x1 vector
+shakeHands_qFR_rad = np.deg2rad(to_unitree(*shakeHands_thetaFR_deg))
+
+
+# --- QUESTION 7: Smooth Gain Transitions (Phase 3-5 Fixed Gains) ---
+# Static transition gains kp (12x1 vector) for Phase 3, 4, and 5
+phase3_fixed_kp = np.array([
+    15, 15, 15,    # FR (low stiffness while lifted to allow handshake compliance)
+    70, 100, 100,  # FL (high stiffness to support torso weight)
+    70, 100, 100,  # RR (high stiffness to support torso weight)
+    70, 100, 100   # RL (high stiffness to support torso weight)
+], dtype=float)
+
+
+# --- QUESTION 8: Sine Wave Definition (Phase 4 Wave Gesture) ---
+# Waving amplitude in radians and number of wave cycles
+shakeHands_sinAmp_rad = np.deg2rad(20.0)  # TODO: Students provide float value
+shakeHands_nWaves = 2                    # TODO: Students provide integer value
+
+
+# =====================================================================
+#             SYSTEM CONTROLLER INNER LOGIC (DO NOT TOUCH)
+# =====================================================================
+# Import kinematics package dynamically
 try:
-    import os
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))
-    from unitreeGo2Model import forward_kinematics, inverse_kinematics, standing_configuration, unitree_joints_from_full_configuration, is_contact
+    from unitreeGo2Model import forward_kinematics, inverse_kinematics, standing_configuration, unitree_joints_from_full_configuration
     
     # Calculate leanBack_q_rad dynamically using analytical IK
     q0_joints = standing_configuration()
@@ -86,11 +135,6 @@ except Exception as e:
 lieDown_q_rad = np.array([-0.35, 1.36, -2.65, 0.35, 1.36, -2.65,
                              -0.5, 1.36, -2.65, 0.5, 1.36, -2.65])
 
-shakeHands_thetaFR_deg = np.array([-20.0, 60.0, 20.0])
-shakeHands_qFR_rad = np.deg2rad(to_unitree(*shakeHands_thetaFR_deg))
-shakeHands_sinAmp_rad = np.deg2rad(20)
-shakeHands_nWaves = 2
-
 standUp_q_rad = np.array([-0.04, 0.67, -1.3, 0.04, 0.67, -1.3, -0.04, 0.67, -1.3, 0.04, 0.67, -1.3])
 standDown_q_rad = np.array([
     0.0473455, 1.22187, -2.44375, -0.0473455, 1.22187, -2.44375,
@@ -101,6 +145,7 @@ shakeHands_q_rad = np.concatenate([
     shakeHands_qFR_rad,
     leanBack_q_rad[3:12],
 ])
+
 speedFactor = 1.3  # Speed factor to adjust the duration of each phase
 standUp_Time = 3.0/speedFactor
 leanBack_Time = 2.0/speedFactor
@@ -227,6 +272,9 @@ class ShakeHands:
         if self.firstRun:
             for i in range(12):
                 self.startPos[i] = self.low_state.motor_state[i].q
+            
+            # Solve startup jump discrepancy by dynamically setting the standUp_traj start position
+            self.standUp_traj = MinJerk(self.startPos, standUp_q_rad, T=1.0)
             self.firstRun = False
 
         self.running_time += self.dt
@@ -241,7 +289,7 @@ class ShakeHands:
         t7 = t6 + standDown_Time
         t8 = t7 + lieDown_Time
 
-        # Stand up phase
+        # Phase 1: Stand up phase
         if self.running_time < t1:
             phase = np.min([self.running_time / standUp_Time, 1.0])
             q_des, v_des, _ = self.standUp_traj.eval(t=phase)
@@ -249,50 +297,50 @@ class ShakeHands:
             kd_des = np.full(12, 3.5)
             dq_des = np.zeros(12)
 
-        # Lean back phase
+        # Phase 2: Lean back phase
         elif self.running_time < t2:
             phase = np.min([(self.running_time - t1) / leanBack_Time, 1.0])
             q_des, v_des, _ = self.leanBack_traj.eval(t=phase)
-            kp_des = 70.0 + phase * 30.0 * np.array([-1, -1, -1, 0, 1, 1, 0, 1, 1, 0, 1, 1])
+            kp_des = 70.0 + phase * 30.0 * phase2_kp_directions
             kd_des = np.full(12, 3.5)
             dq_des = v_des
 
-        # Lift hand phase
+        # Phase 3: Lift hand phase
         elif self.running_time < t3:
             phase = np.min([(self.running_time - t2) / liftHand_Time, 1.0])
             q_des, v_des, _ = self.liftHand_traj.eval(t=phase)
-            kp_des = np.array([15, 15, 15, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
+            kp_des = phase3_fixed_kp
             kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
             dq_des = v_des
 
-        # Wave hand phase
+        # Phase 4: Wave hand phase
         elif self.running_time < t4:
             phase = np.min([(self.running_time - t3) / waveHand_Time, 1.0])
             q_des, _, _ = self.liftHand_traj.eval(t=1.0)
             q_des[0] += shakeHands_sinAmp_rad/4 * np.sin(2.0 * np.pi * shakeHands_nWaves * phase)
             q_des[1] += shakeHands_sinAmp_rad/4 * np.sin(2.0 * np.pi * shakeHands_nWaves * phase)
             q_des[2] += shakeHands_sinAmp_rad * np.sin(2.0 * np.pi * shakeHands_nWaves * phase)
-            kp_des = np.array([15, 15, 15, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
+            kp_des = phase3_fixed_kp
             kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
             dq_des = np.zeros(12)
 
-        # lower hand phase
+        # Phase 5: Lower hand phase
         elif self.running_time < t5:
             phase = np.min([(self.running_time - t4) / lowerHand_Time, 1.0])
             q_des, v_des, _ = self.liftHand_traj.eval(t=1.0 - phase)
-            kp_des = np.array([15, 15, 15, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
+            kp_des = phase3_fixed_kp
             kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
             dq_des = v_des
 
-        # Lean back return phase
+        # Phase 6: Lean Forward phase
         elif self.running_time < t6:
             phase = np.min([(self.running_time - t5) / leanBackReturn_Time, 1.0])
             q_des, v_des, _ = self.leanBack_traj.eval(t=1.0 - phase)
-            kp_des = 70.0 + (1.0 - phase) * 30.0 * np.array([-1, -1, -1, 0, 1, 1, 0, 1, 1, 0, 1, 1])
+            kp_des = 70.0 + (1.0 - phase) * 30.0 * phase2_kp_directions
             kd_des = np.full(12, 3.5)
             dq_des = v_des
 
-        # Stand down phase
+        # Phase 7: Lower Down phase
         elif self.running_time < t7:
             phase = np.min([(self.running_time - t6) / standDown_Time, 1.0])
             q_des, v_des, _ = self.standUp_traj.eval(t=1.0 - phase)
@@ -300,7 +348,7 @@ class ShakeHands:
             kd_des = np.full(12, 3.5)
             dq_des = v_des
 
-        # Lie down phase
+        # Phase 8: Lie down phase (Safety/Resting Phase)
         elif self.running_time < t8:
             phase = np.min([(self.running_time - t7) / lieDown_Time, 1.0])
             q_des, _, _ = self.ending_traj.eval(t=phase)
@@ -325,7 +373,6 @@ class ShakeHands:
         self.lowcmd_publisher.Write(self.low_cmd)
 
 if __name__ == '__main__':
-
     print("WARNING: Please ensure there are no obstacles around the robot while running this example.")
     input("Press Enter to continue...")
 
@@ -361,5 +408,3 @@ if __name__ == '__main__':
             shakehands.low_cmd.crc = shakehands.crc.Crc(shakehands.low_cmd)
             shakehands.lowcmd_publisher.Write(shakehands.low_cmd)
             break
-        
-            
