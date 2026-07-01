@@ -264,6 +264,8 @@ class ShakeHands:
         elif self.running_time < t4:
             phase = np.min([(self.running_time - t3) / waveHand_Time, 1.0])
             q_des, _, _ = self.liftHand_traj.eval(t=1.0)
+            q_des[0] += SHAKE_HANDS_SINEAMP_RAD/10 * np.sin(2.0 * np.pi * SHAKE_HANDS_WAVE_FREQUENCY_HZ * phase)
+            q_des[1] += SHAKE_HANDS_SINEAMP_RAD/4 * np.sin(2.0 * np.pi * SHAKE_HANDS_WAVE_FREQUENCY_HZ * phase)
             q_des[2] += SHAKE_HANDS_SINEAMP_RAD * np.sin(2.0 * np.pi * SHAKE_HANDS_WAVE_FREQUENCY_HZ * phase)
             kp_des = np.array([15, 15, 15, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
             kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
