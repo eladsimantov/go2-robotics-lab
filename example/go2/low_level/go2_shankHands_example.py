@@ -4,7 +4,7 @@ Low-level shake-hands example for the Go2 robot.
 The controller follows the same publisher/subscriber pattern as the working stand example, but the
 motion logic is organized as a seven-phase sequence:
 1. Stand up from the default low-level posture.
-2. Lean backward into the support pose.
+2. Lean backward into the support pose by defining a task space endpoint.
 3. Move the front-right leg into the shake-hands configuration.
 4. Hold the shake-hands pose and wave the front-right leg.
 5. Return the front-right leg back to the shake-hands configuration.
@@ -15,7 +15,7 @@ Each phase uses joint-space interpolation with position control and simple gain 
 
 ---------------------------------------
 Author: Elad Siman Tov
-Date: 2026-01
+Date: 2026-07
 """
 import time
 import sys
@@ -86,8 +86,8 @@ except Exception as e:
 LIE_DOWN_Q_RAD = np.array([-0.35, 1.36, -2.65, 0.35, 1.36, -2.65,
                              -0.5, 1.36, -2.65, 0.5, 1.36, -2.65])
 
-SHAKE_HANDS_THETA_DEG = np.array([-9.0, 62.0, 20.0])
-SHAKE_HANDS_SINEAMP_RAD = np.deg2rad(25)
+SHAKE_HANDS_THETA_DEG = np.array([-20.0, 60.0, 20.0])
+SHAKE_HANDS_SINEAMP_RAD = np.deg2rad(20)
 SHAKE_HANDS_WAVE_FREQUENCY_HZ = 2.0
 
 STAND_UP_Q_RAD = np.array([-0.04, 0.67, -1.3, 0.04, 0.67, -1.3, -0.04, 0.67, -1.3, 0.04, 0.67, -1.3])
@@ -100,16 +100,16 @@ SHAKE_HANDS_Q_RAD = np.concatenate([
     np.deg2rad(to_unitree(*SHAKE_HANDS_THETA_DEG)),
     LEAN_BACK_Q_RAD[3:12],
 ])
-
-standUp_Time = 3.0/1.3
-leanBack_Time = 2.0/1.3
-liftHand_Time = 2.0/1.5
-waveHand_Time = 3.0/1.3
-lowerHand_Time = 2.0/1.3
-leanBackReturn_Time = 2.0/1.3
-standDown_Time = 3.0/1.3
-lieDown_Time = 2.0/1.3
-damping_Time = 3.0/1.3
+speedFactor = 1.3  # Speed factor to adjust the duration of each phase
+standUp_Time = 3.0/speedFactor
+leanBack_Time = 2.0/speedFactor
+liftHand_Time = 2.0/speedFactor
+waveHand_Time = 2.5/speedFactor
+lowerHand_Time = 2.0/speedFactor
+leanBackReturn_Time = 2.0/speedFactor
+standDown_Time = 3.0/speedFactor
+lieDown_Time = 2.0/speedFactor
+damping_Time = 3.0/speedFactor
 
 SIM_TIME = (
     standUp_Time
@@ -240,6 +240,7 @@ class ShakeHands:
         t7 = t6 + standDown_Time
         t8 = t7 + lieDown_Time
 
+        # Stand up phase
         if self.running_time < t1:
             phase = np.min([self.running_time / standUp_Time, 1.0])
             q_des, v_des, _ = self.standUp_traj.eval(t=phase)
@@ -247,6 +248,7 @@ class ShakeHands:
             kd_des = np.full(12, 3.5)
             dq_des = np.zeros(12)
 
+        # Lean back phase
         elif self.running_time < t2:
             phase = np.min([(self.running_time - t1) / leanBack_Time, 1.0])
             q_des, v_des, _ = self.leanBack_traj.eval(t=phase)
@@ -254,6 +256,7 @@ class ShakeHands:
             kd_des = np.full(12, 3.5)
             dq_des = v_des
 
+        # Lift hand phase
         elif self.running_time < t3:
             phase = np.min([(self.running_time - t2) / liftHand_Time, 1.0])
             q_des, v_des, _ = self.liftHand_traj.eval(t=phase)
@@ -261,16 +264,18 @@ class ShakeHands:
             kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
             dq_des = v_des
 
+        # Wave hand phase
         elif self.running_time < t4:
             phase = np.min([(self.running_time - t3) / waveHand_Time, 1.0])
             q_des, _, _ = self.liftHand_traj.eval(t=1.0)
-            q_des[0] += SHAKE_HANDS_SINEAMP_RAD/10 * np.sin(2.0 * np.pi * SHAKE_HANDS_WAVE_FREQUENCY_HZ * phase)
+            q_des[0] += SHAKE_HANDS_SINEAMP_RAD/4 * np.sin(2.0 * np.pi * SHAKE_HANDS_WAVE_FREQUENCY_HZ * phase)
             q_des[1] += SHAKE_HANDS_SINEAMP_RAD/4 * np.sin(2.0 * np.pi * SHAKE_HANDS_WAVE_FREQUENCY_HZ * phase)
             q_des[2] += SHAKE_HANDS_SINEAMP_RAD * np.sin(2.0 * np.pi * SHAKE_HANDS_WAVE_FREQUENCY_HZ * phase)
             kp_des = np.array([15, 15, 15, 70, 100, 100, 70, 100, 100, 70, 100, 100], dtype=float)
             kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
             dq_des = np.zeros(12)
 
+        # lower hand phase
         elif self.running_time < t5:
             phase = np.min([(self.running_time - t4) / lowerHand_Time, 1.0])
             q_des, v_des, _ = self.liftHand_traj.eval(t=1.0 - phase)
@@ -278,6 +283,7 @@ class ShakeHands:
             kd_des = np.array([1, 1, 1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5], dtype=float)
             dq_des = v_des
 
+        # Lean back return phase
         elif self.running_time < t6:
             phase = np.min([(self.running_time - t5) / leanBackReturn_Time, 1.0])
             q_des, v_des, _ = self.leanBack_traj.eval(t=1.0 - phase)
@@ -285,6 +291,7 @@ class ShakeHands:
             kd_des = np.full(12, 3.5)
             dq_des = v_des
 
+        # Stand down phase
         elif self.running_time < t7:
             phase = np.min([(self.running_time - t6) / standDown_Time, 1.0])
             q_des, v_des, _ = self.standUp_traj.eval(t=1.0 - phase)
@@ -292,6 +299,7 @@ class ShakeHands:
             kd_des = np.full(12, 3.5)
             dq_des = v_des
 
+        # Lie down phase
         elif self.running_time < t8:
             phase = np.min([(self.running_time - t7) / lieDown_Time, 1.0])
             q_des, _, _ = self.ending_traj.eval(t=phase)
