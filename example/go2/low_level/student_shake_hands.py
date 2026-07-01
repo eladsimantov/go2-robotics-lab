@@ -43,52 +43,52 @@ def is_contact(msg: LowState_, leg, threshold=12) -> bool:
     # Hint: see msg.foot_force (FR is 0, FL is 1, RR is 2, RL is 3)
     
     # Students provide T/F output here:
-    # return False
-    
-    # [UNCOMMENT THE BELOW LOGIC TO TEST THE SOLUTION KEY]
-    leg_indices = {"FR": 0, "FL": 1, "RR": 2, "RL": 3}
-    idx = leg_indices[leg[:2].upper()]
-    return bool(msg.foot_force[idx] > threshold)
+    return False
 
 
 # --- QUESTION 4: Lean Back State ---
 # Define base pose parameters for leaning back to shift COM before lifting FR leg
 # (x-forward, y-left, z-up relative to standing pose)
-leanBack_basePos_m = np.array([-0.055, 0.03, 0.23])   # TODO: Students fill 3x1 vector
-leanBack_baseRpy_rad = np.array([0.00, -0.2, 0.1])    # TODO: Students fill 3x1 RPY vector (radians)
+# TODO: Students modify this vector to lean back stably. Keep z height around standing height (0.23 to 0.28).
+leanBack_basePos_m = np.array([0.0, 0.0, 0.28])   # Students fill/modify this 3x1 vector
+leanBack_baseRpy_rad = np.array([0.00, 0.00, 0.00])  # Students fill/modify this 3x1 RPY vector (radians)
 
 
 # --- QUESTION 5: Stiffness Directions (Phase 2 Gain Scheduling) ---
 # Directions of change in gains: {1} for increase, {-1} for decrease, {0} for no change.
 # Vector of length 12: [FR_hip, FR_thigh, FR_calf, FL_hip, FL_thigh, FL_calf, RR_hip...]
+# TODO: Students fill this vector based on which legs bear load vs lifted leg
 phase2_kp_directions = np.array([
-    -1, -1, -1,  # FR leg (lifted/shake-hands leg)
-     0,  1,  1,  # FL leg (support leg)
-     0,  1,  1,  # RR leg (support leg)
-     0,  1,  1   # RL leg (support leg)
+     0,  0,  0,  # FR leg
+     0,  0,  0,  # FL leg
+     0,  0,  0,  # RR leg
+     0,  0,  0   # RL leg
 ])
 
 
 # --- QUESTION 6: Shake Hands Position ---
 # Leg joint angle vector (theta_1, theta_2, theta_3 in degrees) for the lifted leg
-shakeHands_thetaFR_deg = np.array([-20.0, 60.0, 20.0])  # TODO: Students fill 3x1 vector
+# TODO: Students fill this vector based on their prelab answers (FK/IK app)
+shakeHands_thetaFR_deg = np.array([0.0, 0.0, 0.0])  # Students fill this 3x1 vector
 shakeHands_qFR_rad = np.deg2rad(to_unitree(*shakeHands_thetaFR_deg))
 
 
 # --- QUESTION 7: Smooth Gain Transitions (Phase 3-5 Fixed Gains) ---
 # Static transition gains kp (12x1 vector) for Phase 3, 4, and 5
+# TODO: Students fill in fixed gains for each motor
 phase3_fixed_kp = np.array([
-    15, 15, 15,    # FR (low stiffness while lifted to allow handshake compliance)
-    70, 100, 100,  # FL (high stiffness to support torso weight)
-    70, 100, 100,  # RR (high stiffness to support torso weight)
-    70, 100, 100   # RL (high stiffness to support torso weight)
+     0,  0,  0,  # FR leg
+     0,  0,  0,  # FL leg
+     0,  0,  0,  # RR leg
+     0,  0,  0   # RL leg
 ], dtype=float)
 
 
 # --- QUESTION 8: Sine Wave Definition (Phase 4 Wave Gesture) ---
 # Waving amplitude in radians and number of wave cycles
-shakeHands_sinAmp_rad = np.deg2rad(20.0)  # TODO: Students provide float value
-shakeHands_nWaves = 2                    # TODO: Students provide integer value
+# TODO: Students fill in amplitude and number of wave cycles
+shakeHands_sinAmp_rad = np.deg2rad(0.0)  # Students provide float value
+shakeHands_nWaves = 0                    # Students provide integer value
 
 
 # =====================================================================
