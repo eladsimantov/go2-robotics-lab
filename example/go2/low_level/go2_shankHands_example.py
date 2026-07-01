@@ -42,7 +42,7 @@ def to_unitree(theta_1, theta_2, theta_3):
 # Base pose parameters for Leaning Back (extracted from the working manual configuration)
 # This includes a shift to the left (y = 4.7cm) and a roll to the left (roll = 5.2 deg)
 # to shift the center of mass over the FL-RR-RL support triangle before lifting the FR leg.
-LEAN_BACK_BASE_POS = np.array([-0.055, 0.06, 0.26]) # x-forward, y-left, z-up (relative to the standing pose)
+LEAN_BACK_BASE_POS = np.array([-0.045, 0.04, 0.23])   # x-forward, y-left, z-up (relative to the standing pose)
 LEAN_BACK_BASE_RPY = np.array([0.07, -0.07, -0.057])  # Roll=5.2 deg, Pitch=-3.0 deg, Yaw=-3.3 deg
 
 try:
@@ -90,7 +90,7 @@ SHAKE_HANDS_THETA_DEG = np.array([-9.0, 52.0, 20.0])
 SHAKE_HANDS_SINEAMP_RAD = np.deg2rad(15)
 SHAKE_HANDS_WAVE_FREQUENCY_HZ = 2.0
 
-STAND_UP_Q_RAD = np.array([-0.08, 0.67, -1.3, 0.08, 0.67, -1.3, -0.08, 0.67, -1.3, 0.08, 0.67, -1.3])
+STAND_UP_Q_RAD = np.array([-0.04, 0.67, -1.3, 0.04, 0.67, -1.3, -0.04, 0.67, -1.3, 0.04, 0.67, -1.3])
 STAND_DOWN_Q_RAD = np.array([
     0.0473455, 1.22187, -2.44375, -0.0473455, 1.22187, -2.44375,
     0.0473455, 1.22187, -2.44375, -0.0473455, 1.22187, -2.44375,

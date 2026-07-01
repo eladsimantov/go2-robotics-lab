@@ -1001,7 +1001,7 @@ def inverse_kinematics(
     )
 
 
-def is_contact(msg, leg, threshold=20) -> bool:
+def is_contact(msg, leg, threshold=12) -> bool:
     """
     Checks if a leg is in contact with the ground.
 
