@@ -42,8 +42,8 @@ def to_unitree(theta_1, theta_2, theta_3):
 # Base pose parameters for Leaning Back (extracted from the working manual configuration)
 # This includes a shift to the left (y = 4.7cm) and a roll to the left (roll = 5.2 deg)
 # to shift the center of mass over the FL-RR-RL support triangle before lifting the FR leg.
-LEAN_BACK_BASE_POS = np.array([-0.045, 0.04, 0.23])   # x-forward, y-left, z-up (relative to the standing pose)
-LEAN_BACK_BASE_RPY = np.array([0.07, -0.07, -0.057])  # Roll=5.2 deg, Pitch=-3.0 deg, Yaw=-3.3 deg
+LEAN_BACK_BASE_POS = np.array([-0.055, 0.03, 0.23])   # x-forward, y-left, z-up (relative to the standing pose)
+LEAN_BACK_BASE_RPY = np.array([0.00, -0.2, 0.1])  # Roll=5.2 deg, Pitch=-3.0 deg, Yaw=-3.3 deg
 
 try:
     import os
@@ -87,7 +87,7 @@ LIE_DOWN_Q_RAD = np.array([-0.35, 1.36, -2.65, 0.35, 1.36, -2.65,
                              -0.5, 1.36, -2.65, 0.5, 1.36, -2.65])
 
 SHAKE_HANDS_THETA_DEG = np.array([-9.0, 52.0, 20.0])
-SHAKE_HANDS_SINEAMP_RAD = np.deg2rad(15)
+SHAKE_HANDS_SINEAMP_RAD = np.deg2rad(25)
 SHAKE_HANDS_WAVE_FREQUENCY_HZ = 2.0
 
 STAND_UP_Q_RAD = np.array([-0.04, 0.67, -1.3, 0.04, 0.67, -1.3, -0.04, 0.67, -1.3, 0.04, 0.67, -1.3])
@@ -101,15 +101,15 @@ SHAKE_HANDS_Q_RAD = np.concatenate([
     LEAN_BACK_Q_RAD[3:12],
 ])
 
-standUp_Time = 3.0
-leanBack_Time = 2.0
-liftHand_Time = 2.0
-waveHand_Time = 3.0
-lowerHand_Time = 2.0
-leanBackReturn_Time = 2.0
-standDown_Time = 3.0
-lieDown_Time = 2.0
-damping_Time = 3.0
+standUp_Time = 3.0/1.3
+leanBack_Time = 2.0/1.3
+liftHand_Time = 2.0/1.3
+waveHand_Time = 3.0/1.3
+lowerHand_Time = 2.0/1.3
+leanBackReturn_Time = 2.0/1.3
+standDown_Time = 3.0/1.3
+lieDown_Time = 2.0/1.3
+damping_Time = 3.0/1.3
 
 SIM_TIME = (
     standUp_Time
