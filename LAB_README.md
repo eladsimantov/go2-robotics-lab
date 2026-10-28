@@ -19,3 +19,19 @@ python3 student_shake_hands.py
 ```
 
 
+# Deploy to real time
+MUST CHECK SIMULATION BEFORE!
+MUST APPROVE BY INSTRUCTOR!
+
+Get the interface via:
+```bash
+ifconfig
+```
+
+Run your controller with the interface identifier ('enp0s31f6')
+```bash
+cd ~
+source /home/user_robodog/go2_lab/go2-robotics-lab/.venv/bin/activate
+cd /home/user_robodog/go2_lab/go2-robotics-lab/example/go2/low_level
+python3 student_shake_hands.py enp0s31f6
+```
