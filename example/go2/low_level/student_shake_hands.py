@@ -2,8 +2,9 @@
 Advanced Robotics Lab - Unitree Go2 Quadruped Robot
 Lab Exercise: "Shake Hands" Low-Level Control (Student Template)
 
-Author: Elad Siman Tov
-Date: 2026-07
+Student Name #1: ____________________________
+Student Name #2: ____________________________
+Date: YYYY-MM-DD
 """
 import time
 import sys
@@ -24,8 +25,10 @@ from unitree_sdk2py.comm.motion_switcher.motion_switcher_client import MotionSwi
 from unitree_sdk2py.go2.sport.sport_client import SportClient
 from trajGen import MinJerk
 
+
+# --- Prelab: conversion from GUI to Unitree joint angles ---
 def to_unitree(theta_1, theta_2, theta_3):
-    """Converts local joint angles to Unitree joint offsets in degrees."""
+    """Converts local GUI angles to Unitree joint offsets in degrees."""
     return np.array([theta_1, -theta_2, -90.0 - theta_3])
 
 
@@ -54,8 +57,8 @@ def is_contact(msg: LowState_, leg, threshold=12) -> bool:
 # --- QUESTION 4: Lean Back State ---
 # Define base pose parameters for leaning back to shift COM before lifting FR leg
 # (x-forward, y-left, z-up relative to standing pose)
-leanBack_basePos_m = np.array([-0.055, 0.03, 0.23])   # TODO: Students fill 3x1 vector
-leanBack_baseRpy_rad = np.array([0.00, -0.2, 0.1])    # TODO: Students fill 3x1 RPY vector (radians)
+leanBack_basePos_m = np.array([-0.065, 0.03, 0.28])   # TODO: Students fill 3x1 vector
+leanBack_baseRpy_rad = np.array([0.00, -0.3, 0.03])    # TODO: Students fill 3x1 RPY vector (radians)
 
 
 # --- QUESTION 5: Stiffness Directions (Phase 2 Gain Scheduling) ---
