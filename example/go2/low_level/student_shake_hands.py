@@ -57,8 +57,8 @@ def is_contact(msg: LowState_, leg, threshold=12) -> bool:
 # --- QUESTION 4: Lean Back State ---
 # Define base pose parameters for leaning back to shift COM before lifting FR leg
 # (x-forward, y-left, z-up relative to standing pose)
-leanBack_basePos_m = np.array([-0.065, 0.03, 0.28])   # TODO: Students fill 3x1 vector
-leanBack_baseRpy_rad = np.array([0.00, -0.3, 0.03])    # TODO: Students fill 3x1 RPY vector (radians)
+leanBack_basePos_m = np.array([-0.055, 0.03, 0.23])   # TODO: Students fill 3x1 vector
+leanBack_baseRpy_rad = np.array([0.00, -0.2, 0.1])    # TODO: Students fill 3x1 RPY vector (radians)
 
 
 # --- QUESTION 5: Stiffness Directions (Phase 2 Gain Scheduling) ---
