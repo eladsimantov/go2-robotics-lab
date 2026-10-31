@@ -33,6 +33,7 @@ import unitree_legged_const as go2
 from unitree_sdk2py.comm.motion_switcher.motion_switcher_client import MotionSwitcherClient
 from unitree_sdk2py.go2.sport.sport_client import SportClient
 from trajGen import MinJerk
+from lab_recorder import LabRecorder
 
 
 def to_unitree(theta_1, theta_2, theta_3):
@@ -341,12 +342,24 @@ if __name__ == '__main__':
 
     shakehands = ShakeHands(is_simulation=is_sim)
     shakehands.Init()
+
+    # Record the run to recordings/<this file>_sim.pkl or recordings/<this file>_robot.pkl
+    recorder = LabRecorder(
+        os.path.splitext(os.path.basename(__file__))[0] + ("_sim" if is_sim else "_robot"),
+        meta={"phase_times": {
+            "Stand Up": standUp_Time, "Lean Back": leanBack_Time, "Lift Hand": liftHand_Time,
+            "Wave Hand": waveHand_Time, "Lower Hand": lowerHand_Time, "Lean Forward": leanBackReturn_Time,
+            "Lower Down": standDown_Time, "Lie Down": lieDown_Time, "Damping": damping_Time,
+        }},
+    )
+    recorder.Start()
     shakehands.Start()
 
     while True:
         try:
             if shakehands.running_time >= SIM_TIME:
                 time.sleep(1)
+                recorder.Save()
                 print("Done!")
                 sys.exit(0)
             time.sleep(1)
@@ -360,6 +373,7 @@ if __name__ == '__main__':
                 shakehands.low_cmd.motor_cmd[i].tau = 0.0
             shakehands.low_cmd.crc = shakehands.crc.Crc(shakehands.low_cmd)
             shakehands.lowcmd_publisher.Write(shakehands.low_cmd)
+            recorder.Save()
             break
         
             
